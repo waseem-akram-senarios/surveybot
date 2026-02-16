@@ -1,0 +1,3 @@
+[submodule "itcurves_deploy"]
+	path = itcurves_deploy
+	url = ./itcurves_deploy

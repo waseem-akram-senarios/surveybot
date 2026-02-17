@@ -47,8 +47,8 @@ An AI-powered survey platform that conducts intelligent phone and web surveys us
 
 ```bash
 # 1. Clone
-git clone https://github.com/waseem-akram-senarios/surveybot.git
-cd surveybot/survai-platform
+git clone https://github.com/waseem-akram-senarios/survey-bot.git
+cd survey-bot/survai-platform
 
 # 2. Configure
 cp .env.example .env

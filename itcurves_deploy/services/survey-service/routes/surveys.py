@@ -44,7 +44,7 @@ from db import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-AGENT_SERVICE_URL = os.getenv("AGENT_SERVICE_URL", "http://agent-service:8050")
+VOICE_SERVICE_URL = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8017")
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -685,11 +685,11 @@ async def submit_phone_answers(qna_data: SurveyQnAPhone, background_tasks: Backg
 
 @router.post("/surveys/makecall")
 async def makecall(request: MakeCallRequest):
-    """Make VAPI call via agent-service /api/agent/make-call."""
+    """Make VAPI call via voice-service /api/voice/make-call."""
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
-                f"{AGENT_SERVICE_URL}/api/agent/make-call",
+                f"{VOICE_SERVICE_URL}/api/voice/make-call",
                 params={
                     "survey_id": request.survey_id,
                     "phone": request.phone,
@@ -700,8 +700,8 @@ async def makecall(request: MakeCallRequest):
                 raise HTTPException(status_code=resp.status_code, detail=resp.text)
             return resp.json()
     except httpx.RequestError as e:
-        logger.error(f"Agent service call failed: {e}")
-        raise HTTPException(status_code=502, detail=f"Agent service unreachable: {str(e)}")
+        logger.error(f"Voice service call failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Voice service unreachable: {str(e)}")
 
 
 @router.post("/surveys/sendemail")
@@ -757,7 +757,7 @@ def _run_makecall_sync(survey_id: str, phone: str, provider: str):
     async def _call():
         async with httpx.AsyncClient(timeout=60.0) as client:
             await client.post(
-                f"{AGENT_SERVICE_URL}/api/agent/make-call",
+                f"{VOICE_SERVICE_URL}/api/voice/make-call",
                 params={"survey_id": survey_id, "phone": phone, "provider": provider},
             )
 

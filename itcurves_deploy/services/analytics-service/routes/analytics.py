@@ -7,10 +7,12 @@ import logging
 import os
 from typing import Any, Dict, Optional
 
+import httpx
 from fastapi import APIRouter, HTTPException
-from openai import OpenAI
 
 from db import sql_execute
+
+BRAIN_SERVICE_URL = os.getenv("BRAIN_SERVICE_URL", "http://brain-service:8016")
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -173,39 +175,14 @@ async def analyze_survey(survey_id: str):
         if not combined.strip():
             raise HTTPException(status_code=400, detail="No responses or transcript to analyze")
 
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": """Analyze this survey response. Return a JSON object with:
-- overall_sentiment: "positive", "neutral", or "negative"
-- quality_score: 0-10 float
-- key_themes: array of strings (main themes)
-- summary: 2-3 sentence summary
-- nps_score: 0-10 if NPS-like question present, else null
-- satisfaction_score: 0-5 if satisfaction question present, else null""",
-                },
-                {"role": "user", "content": combined[:8000]},
-            ],
-        )
-        content = response.choices[0].message.content
-        try:
-            if content.strip().startswith("```"):
-                content = content.split("```")[1]
-                if content.startswith("json"):
-                    content = content[4:]
-            data = json.loads(content)
-        except json.JSONDecodeError:
-            data = {
-                "overall_sentiment": "neutral",
-                "quality_score": 0,
-                "key_themes": [],
-                "summary": content[:500] if content else "",
-                "nps_score": None,
-                "satisfaction_score": None,
-            }
+        async with httpx.AsyncClient(timeout=30.0) as http_client:
+            brain_resp = await http_client.post(
+                f"{BRAIN_SERVICE_URL}/api/brain/analyze",
+                json={"combined_text": combined},
+            )
+            if brain_resp.status_code != 200:
+                raise RuntimeError(f"Brain service error: {brain_resp.status_code}")
+            data = brain_resp.json()
 
         sql_execute(
             """INSERT INTO survey_analytics

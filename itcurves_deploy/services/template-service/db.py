@@ -14,8 +14,10 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
-from openai import OpenAI
+import httpx
 from sqlalchemy import create_engine, text
+
+BRAIN_SERVICE_URL = os.getenv("BRAIN_SERVICE_URL", "http://brain-service:8016")
 
 logger = logging.getLogger(__name__)
 
@@ -61,38 +63,35 @@ def get_current_time() -> str:
 
 
 def translate(text: str, language: str) -> str:
-    """Uses OpenAI gpt-4.1-mini to translate text to the target language."""
-    client = OpenAI()
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": f"You are a helpful assistant that translates questions from English to {language}. Translate the question as it is without any additional context or text.",
-            },
-            {"role": "user", "content": text},
-        ],
-    )
-    return response.choices[0].message.content
+    """Translate text via brain-service."""
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.post(
+                f"{BRAIN_SERVICE_URL}/api/brain/translate",
+                json={"text": text, "language": language},
+            )
+            if resp.status_code == 200:
+                return resp.json().get("translated", text)
+    except Exception as e:
+        logger.warning(f"Brain service translate error: {e}")
+    return text
 
 
 def translate_categories(categories: List[str], language: str) -> List[str]:
-    """Uses OpenAI gpt-4.1-mini to translate categories separated by semicolons."""
+    """Translate categories via brain-service."""
     if not categories:
         return []
-    client = OpenAI()
-    joined = "; ".join(categories)
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": f"You are a helpful assistant that translates categories from English to {language}. Translate the categories (separated by semicolon) as it is without any additional context or text.",
-            },
-            {"role": "user", "content": joined},
-        ],
-    )
-    return [c.strip() for c in response.choices[0].message.content.split(";")]
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.post(
+                f"{BRAIN_SERVICE_URL}/api/brain/translate-categories",
+                json={"categories": categories, "language": language},
+            )
+            if resp.status_code == 200:
+                return resp.json().get("translated", categories)
+    except Exception as e:
+        logger.warning(f"Brain service translate-categories error: {e}")
+    return categories
 
 
 def process_question_translation(

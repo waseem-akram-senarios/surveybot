@@ -29,6 +29,8 @@ services:
       - survey-service
       - question-service
       - template-service
+      - brain-service
+      - voice-service
       - agent-service
       - analytics-service
       - scheduler-service
@@ -50,17 +52,18 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=db
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - VAPI_API_KEY=${VAPI_API_KEY}
       - PHONE_NUMBER_ID=${PHONE_NUMBER_ID}
       - MAILERSEND_API_KEY=${MAILERSEND_API_KEY}
       - MAILERSEND_SENDER_EMAIL=${MAILERSEND_SENDER_EMAIL}
-      - AGENT_SERVICE_URL=http://agent-service:8050
+      - BRAIN_SERVICE_URL=http://brain-service:8016
+      - VOICE_SERVICE_URL=http://voice-service:8017
       - TEMPLATE_SERVICE_URL=http://template-service:8040
       - QUESTION_SERVICE_URL=http://question-service:8030
       - SCHEDULER_SERVICE_URL=http://scheduler-service:8070
     depends_on:
       - redis
+      - brain-service
 
   # ─── Question Service (port 8030) ───────────────────────────────────────────
 
@@ -79,7 +82,9 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=db
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - BRAIN_SERVICE_URL=http://brain-service:8016
+    depends_on:
+      - brain-service
 
   # ─── Template Service (port 8040) ───────────────────────────────────────────
 
@@ -98,9 +103,51 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=db
+      - BRAIN_SERVICE_URL=http://brain-service:8016
+    depends_on:
+      - brain-service
+
+  # ─── Brain Service (port 8016) -- Centralized AI/LLM Intelligence ───────────
+
+  brain-service:
+    build:
+      context: .
+      dockerfile: services/brain-service/Dockerfile
+    container_name: brain-service
+    ports:
+      - "8016:8016"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
 
-  # ─── Agent Service (port 8050) ──────────────────────────────────────────────
+  # ─── Voice Service (port 8017) -- VAPI Calls & Workflows ──────────────────
+
+  voice-service:
+    build:
+      context: .
+      dockerfile: services/voice-service/Dockerfile
+    container_name: voice-service
+    ports:
+      - "8017:8017"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=db
+      - VAPI_API_KEY=${VAPI_API_KEY}
+      - PHONE_NUMBER_ID=${PHONE_NUMBER_ID}
+      - MAILERSEND_API_KEY=${MAILERSEND_API_KEY}
+      - MAILERSEND_SENDER_EMAIL=${MAILERSEND_SENDER_EMAIL}
+      - BRAIN_SERVICE_URL=http://brain-service:8016
+      - SURVEY_SUBMIT_URL=${PUBLIC_URL}/pg/api/answers/qna_phone
+    depends_on:
+      - brain-service
+
+  # ─── Agent Service (port 8050) -- KEPT for backward compat, will be removed ─
 
   agent-service:
     build:
@@ -142,7 +189,9 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=db
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - BRAIN_SERVICE_URL=http://brain-service:8016
+    depends_on:
+      - brain-service
 
   # ─── Scheduler Service (port 8070) ──────────────────────────────────────────
 
@@ -161,9 +210,10 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=db
-      - AGENT_SERVICE_URL=http://agent-service:8050
+      - VOICE_SERVICE_URL=http://voice-service:8017
     depends_on:
       - redis
+      - voice-service
 
   # ─── LiveKit Agent (optional) ───────────────────────────────────────────────
 

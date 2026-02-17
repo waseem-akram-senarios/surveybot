@@ -29,9 +29,9 @@ def get_scheduler() -> BackgroundScheduler:
 
 
 def _make_call_job(survey_id: str, phone: str):
-    """Background job: call agent-service /api/agent/make-call."""
-    agent_url = os.getenv("AGENT_SERVICE_URL", "http://agent-service:8050")
-    url = f"{agent_url}/api/agent/make-call"
+    """Background job: call voice-service /api/voice/make-call."""
+    voice_url = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8017")
+    url = f"{voice_url}/api/voice/make-call"
     try:
         with httpx.Client(timeout=30.0) as client:
             r = client.post(url, params={"survey_id": survey_id, "phone": phone})
@@ -48,7 +48,7 @@ async def schedule_call(
     delay_seconds: int = 60,
 ):
     """
-    Schedule a delayed call. Adds APScheduler job that calls agent-service /api/agent/make-call.
+    Schedule a delayed call. Adds APScheduler job that calls voice-service /api/voice/make-call.
     """
     try:
         job_id = str(uuid4())
@@ -124,12 +124,12 @@ async def schedule_campaign(
                        AND s.phone IS NOT NULL AND s.phone != ''""",
                     {"cid": campaign_id},
                 )
-                agent_url = os.getenv("AGENT_SERVICE_URL", "http://agent-service:8050")
+                voice_url = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8017")
                 for survey in surveys:
                     try:
                         with httpx.Client(timeout=30.0) as client:
                             r = client.post(
-                                f"{agent_url}/api/agent/make-call",
+                                f"{voice_url}/api/voice/make-call",
                                 params={"survey_id": survey["id"], "phone": survey["phone"]},
                             )
                             r.raise_for_status()

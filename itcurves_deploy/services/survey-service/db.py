@@ -11,9 +11,9 @@ import os
 from datetime import datetime, timezone
 from typing import Literal, Optional, Union
 
+import httpx
 import requests
 from fastapi import HTTPException
-from openai import OpenAI
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 
@@ -21,14 +21,7 @@ from shared.models.common import SurveyQuestionAnswerP
 
 logger = logging.getLogger(__name__)
 
-# Prompts
-filtering_prompt = "You are a helpful survey assistant. Given a user's biodata and other information, determine whether the given survey question is relevant or not. Simply return 'Yes' if it is or 'No' if it isn't without any additional text."
-
-autofill_prompt = "You are a helpful survey assistant. Given a question, context, and a list of response options, determine whether the question can be answered based strictly on the provided context. If the context provides clear information about the subject of the question, choose the most appropriate response from the options. If the context does not provide enough information to answer the question about the specific subject mentioned, return an empty string. Do not make assumptions or infer information that is not explicitly stated. Your response should include only the answer selected from the list, or an empty string if the answer cannot be determined."
-
-autofill_prompt_open = "You are a helpful survey assistant. Given a question and a context, extract the answer to the question based strictly on the provided context. If the context does not provide enough information to answer the question about the specific subject mentioned, return the string 'Cannot be determined'. Do not make assumptions or infer information that is not explicitly stated."
-
-parse_prompt = "You are a helpful survey assistant. Given a question asked to a user and his response, provide the answer as a value given a list of possible options. Do not make up information or assume anything. Your response must be based on the response of the user."
+BRAIN_SERVICE_URL = os.getenv("BRAIN_SERVICE_URL", "http://brain-service:8016")
 
 
 def get_engine():
@@ -71,82 +64,55 @@ def get_current_time() -> str:
 
 
 def filtering(biodata: str, question: str) -> str:
-    """Hardcoded to return 'Yes' as the current monolith does."""
+    """Determine if a question is relevant. Currently always returns 'Yes'."""
     return "Yes"
 
 
-def parse(question: str, response: str, response_format: type):
-    """Parse user response into structured format using gpt-4.1 with parse_prompt."""
-    openai_client = OpenAI()
-    resp = openai_client.beta.chat.completions.parse(
-        model="gpt-4.1",
-        messages=[
-            {"role": "developer", "content": parse_prompt},
-            {
-                "role": "user",
-                "content": f"Survey Question: {question}\nuser's Response: {response}",
-            },
-        ],
-        response_format=response_format,
-    )
-    return resp.choices[0].message.parsed
+def parse_via_brain(question: str, response: str, options: list, criteria: str = "categorical") -> Optional[str]:
+    """Parse user response via brain-service."""
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.post(
+                f"{BRAIN_SERVICE_URL}/api/brain/parse",
+                json={"question": question, "response": response, "options": options, "criteria": criteria},
+            )
+            if resp.status_code == 200:
+                return resp.json().get("answer")
+    except Exception as e:
+        logger.warning(f"Brain service parse error: {e}")
+    return None
 
 
-def autofill(context: str, question: str, response_format: type):
-    """Autofill answer from context using gpt-4.1 with autofill_prompt."""
-    openai_client = OpenAI()
-    resp = openai_client.beta.chat.completions.parse(
-        model="gpt-4.1",
-        messages=[
-            {"role": "developer", "content": autofill_prompt},
-            {
-                "role": "user",
-                "content": f"Context of the survey: {context}\nSurvey Question: {question}",
-            },
-        ],
-        response_format=response_format,
-    )
-    return resp.choices[0].message.parsed
-
-
-def autofill_open(context: str, question: str) -> Optional[str]:
-    """Autofill open-ended question from context."""
-    openai_client = OpenAI()
-    resp = openai_client.chat.completions.create(
-        model="gpt-4.1",
-        messages=[
-            {"role": "developer", "content": autofill_prompt_open},
-            {
-                "role": "user",
-                "content": f"Context of the survey: {context}\nSurvey Question: {question}",
-            },
-        ],
-    )
-    content = resp.choices[0].message.content
-    if content == "Cannot be determined":
-        return None
-    return content
+def autofill_via_brain(context: str, question: str, options: list, criteria: str = "categorical") -> Optional[str]:
+    """Autofill answer via brain-service."""
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.post(
+                f"{BRAIN_SERVICE_URL}/api/brain/autofill",
+                json={"context": context, "question": question, "options": options, "criteria": criteria},
+            )
+            if resp.status_code == 200:
+                return resp.json().get("answer")
+    except Exception as e:
+        logger.warning(f"Brain service autofill error: {e}")
+    return None
 
 
 def summarize(question: str, response: str) -> str:
-    """Summarize long responses (>300 chars) using gpt-4.1."""
+    """Summarize long responses via brain-service."""
     if len(response) <= 300:
         return response
-    openai_client = OpenAI()
-    resp = openai_client.chat.completions.create(
-        model="gpt-4.1",
-        messages=[
-            {
-                "role": "developer",
-                "content": "You are a helpful assistant that summarizes the response of a survey question. Please summarize the response in one or two short sentences without any additional context or text.",
-            },
-            {
-                "role": "user",
-                "content": f"Survey Question: {question}\nuser's Response: {response}",
-            },
-        ],
-    )
-    return resp.choices[0].message.content
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.post(
+                f"{BRAIN_SERVICE_URL}/api/brain/summarize",
+                json={"question": question, "response": response},
+            )
+            if resp.status_code == 200:
+                return resp.json().get("summary", response)
+    except Exception as e:
+        logger.warning(f"Brain service summarize error: {e}")
+    return response
 
 
 def process_question_sync(question_data, biodata: str) -> Optional[SurveyQuestionAnswerP]:
@@ -155,7 +121,7 @@ def process_question_sync(question_data, biodata: str) -> Optional[SurveyQuestio
 
 
 async def process_question(question, biodata: str) -> Optional[SurveyQuestionAnswerP]:
-    """Process a single question with filtering and autofill."""
+    """Process a single question with filtering and autofill via brain-service."""
     que_id = question.QueId
     choice = filtering(biodata, question.QueText)
 
@@ -165,30 +131,17 @@ async def process_question(question, biodata: str) -> Optional[SurveyQuestionAns
 
         if que_criteria == "scale":
             scale_max = question.QueScale
-            scale_list = list(range(1, int(scale_max) + 1))
-            scale_list = list(map(str, scale_list))
-
-            class AutoFill(BaseModel):
-                can_be_answered_definitely: Literal["Yes", "No"]
-                definite_answer: Optional[Literal[tuple(scale_list)]] = None
-
-            result = autofill(biodata, question.QueText, AutoFill)
-            filled = result.definite_answer if result else None
+            scale_list = [str(i) for i in range(1, int(scale_max) + 1)]
+            filled = autofill_via_brain(biodata, question.QueText, scale_list, "scale")
 
         elif que_criteria == "categorical":
             que_categories = list(question.QueCategories or [])
             if "None of the above" in que_categories:
                 que_categories.remove("None of the above")
-
-            class AutoFill(BaseModel):
-                can_be_answered_definitely: Literal["Yes", "No"]
-                definite_answer: Optional[Literal[tuple(que_categories)]] = None
-
-            result = autofill(biodata, question.QueText, AutoFill)
-            filled = result.definite_answer if result else None
+            filled = autofill_via_brain(biodata, question.QueText, que_categories, "categorical")
 
         elif que_criteria == "open":
-            filled = autofill_open(biodata, question.QueText)
+            filled = autofill_via_brain(biodata, question.QueText, [], "open")
 
         return SurveyQuestionAnswerP(
             QueId=que_id,
@@ -205,40 +158,26 @@ async def process_question(question, biodata: str) -> Optional[SurveyQuestionAns
 
 
 def process_survey_question(question: dict) -> dict:
-    """Process a single survey question to parse the answer from RawAns."""
+    """Process a single survey question to parse the answer from RawAns via brain-service."""
     if question.get("Ans"):
         return question
 
+    raw_ans = question.get("RawAns", "") or ""
+
     if question.get("QueCriteria") == "scale":
         scale_max = question["QueScale"]
-        scale_list = list(range(1, int(scale_max) + 1))
-        scale_list = list(map(str, scale_list))
+        scale_list = [str(i) for i in range(1, int(scale_max) + 1)]
+        answer = parse_via_brain(question.get("QueText", ""), raw_ans, scale_list, "scale")
+        question["Ans"] = answer if answer else "None of the above"
 
-        class Fill(BaseModel):
-            answer: Optional[Literal[tuple(scale_list)]] = None
     elif question.get("QueCriteria") == "categorical":
         que_categories = question.get("QueCategories") or []
+        answer = parse_via_brain(question.get("QueText", ""), raw_ans, que_categories, "categorical")
+        question["Ans"] = answer if answer else "None of the above"
 
-        class Fill(BaseModel):
-            answer: Optional[Literal[tuple(que_categories)]] = None
     else:
-        question["Ans"] = summarize(
-            question.get("QueText", ""), question.get("RawAns", "") or ""
-        )
-        return question
+        question["Ans"] = summarize(question.get("QueText", ""), raw_ans)
 
-    try:
-        parsed = parse(
-            question.get("QueText", ""),
-            question.get("RawAns", "") or "",
-            Fill,
-        )
-        question["Ans"] = parsed.answer if parsed and parsed.answer else "None of the above"
-    except Exception as e:
-        logger.warning(
-            f"Error parsing answer for question {question.get('QueId')}: {str(e)}"
-        )
-        question["Ans"] = "None of the above"
     return question
 
 

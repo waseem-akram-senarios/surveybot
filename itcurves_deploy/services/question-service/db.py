@@ -6,10 +6,10 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
 
-from openai import OpenAI
+import httpx
 from sqlalchemy import create_engine, text
 
-SYMPATHIZE_PROMPT = """You are a helpful customer representative for a company that conducts interview. Given a question and a user's response, try to respond with a short phrase that matches the user's response. If the user's response is positive, appreciate the positive feedback. If the user's response is negative, respond with an apologetic tone. If the user's response is neutral, acknowledge the response without any strong emotion. Do not attempt to remediate the user's response, just acknowledge it. You must not try to repeat the response of the user or phrases from it."""
+BRAIN_SERVICE_URL = os.getenv("BRAIN_SERVICE_URL", "http://brain-service:8016")
 
 engine = create_engine(
     f"postgresql+psycopg2://{os.getenv('DB_USER', 'pguser')}:{os.getenv('DB_PASSWORD', 'root')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5432')}/db"
@@ -39,16 +39,18 @@ def get_current_time() -> str:
 
 
 def sympathize(question: str, response: str) -> str:
-    """Generate empathetic response using OpenAI gpt-4.1-mini."""
-    client = OpenAI()
-    completion = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[
-            {"role": "system", "content": SYMPATHIZE_PROMPT},
-            {"role": "user", "content": f"Question: {question}\nResponse: {response}"},
-        ],
-    )
-    return completion.choices[0].message.content
+    """Generate empathetic response via brain-service."""
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.post(
+                f"{BRAIN_SERVICE_URL}/api/brain/sympathize",
+                json={"question": question, "response": response},
+            )
+            if resp.status_code == 200:
+                return resp.json().get("message", "Thank you for sharing that.")
+    except Exception:
+        pass
+    return "Thank you for sharing that."
 
 
 def process_question_stats(data: Dict[str, Any]) -> Dict[str, int]:

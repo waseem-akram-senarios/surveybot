@@ -1,91 +1,70 @@
-# SurveyBot - AI-Powered Survey System
+# SurveyBot - AI-Powered Survey Platform
 
-A comprehensive survey management system with AI-powered voice and web survey capabilities.
+An AI-powered survey platform that conducts intelligent phone and web surveys using natural conversation. Built with a microservices architecture for scalability and independent deployability.
 
-## 🚀 Features
+## Architecture
 
-- **Multi-modal Surveys**: Web forms and AI voice calls
-- **Voice Integration**: VAPI and LiveKit support for phone surveys
-- **AI-Powered**: OpenAI integration for intelligent conversations
-- **Real-time Analytics**: Dashboard for monitoring survey results
-- **Microservices Architecture**: Scalable and resilient design
-- **Multi-tenant Support**: Organization-based survey management
-
-## 📋 System Components
-
-### Backend Services
-- **Gateway API** (Port 8081): Main API gateway
-- **Survey Service** (Port 8020): Survey management
-- **Template Service** (Port 8040): Survey templates
-- **Question Service** (Port 8030): Question management
-- **Agent Service** (Port 8050): Voice call coordination
-- **Analytics Service** (Port 8060): Data analytics
-- **Scheduler Service** (Port 8070): Automated scheduling
-
-### Frontend Applications
-- **Dashboard** (Port 8080): Admin interface for survey management
-- **Recipient App** (Port 3000): Survey-taking interface
-
-### Voice Integration
-- **VAPI**: AI voice calls with natural conversation
-- **LiveKit**: High-quality voice communication
-- **OpenAI**: AI-powered conversation engine
-- **Deepgram**: Speech-to-text processing
-
-## 🛠️ Tech Stack
-
-### Backend
-- **FastAPI**: Python web framework
-- **PostgreSQL**: Primary database
-- **Redis**: Caching and session management
-- **Docker**: Containerization
-
-### Frontend
-- **React**: Dashboard application
-- **Next.js**: Recipient application
-- **Material-UI**: UI component library
-- **TailwindCSS**: Styling framework
-
-### Voice & AI
-- **VAPI**: Voice AI platform
-- **LiveKit**: Real-time communication
-- **OpenAI**: GPT models
-- **Deepgram**: Speech recognition
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Docker and Docker Compose
-- Node.js 18+
-- Python 3.10+
-
-### Installation
-
-1. **Clone the repository**
-```bash
-git clone <repository-url>
-cd surveybot
+```
+                    ┌──────────────┐
+         Clients ──>│   Gateway    │:8081
+                    │   (nginx)    │
+                    └──────┬───────┘
+                           │
+     ┌─────────────────────┼─────────────────────┐
+     │           │         │         │            │
+┌────▼───┐ ┌────▼───┐ ┌───▼────┐ ┌──▼──────┐ ┌──▼──────┐
+│ Brain  │ │ Voice  │ │ Survey │ │Question │ │Template │
+│ :8016  │ │ :8017  │ │ :8020  │ │ :8030   │ │ :8040   │
+└────────┘ └────────┘ └────────┘ └─────────┘ └─────────┘
+     │                     │
+┌────▼──────┐        ┌────▼──────┐
+│ Analytics │        │ Scheduler │
+│  :8060    │        │  :8070    │
+└───────────┘        └───────────┘
 ```
 
-2. **Start all services**
+### Services
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| **Brain** | 8016 | Centralized AI/LLM intelligence -- prompts, parsing, translation, analysis |
+| **Voice** | 8017 | VAPI call lifecycle -- workflow creation, call initiation, webhooks, transcripts |
+| **Survey** | 8020 | Survey CRUD, answer submission, email delivery |
+| **Question** | 8030 | Question management, stats, empathy responses |
+| **Template** | 8040 | Survey template management, translation |
+| **Analytics** | 8060 | Metrics, CSV export/import, AI analysis |
+| **Scheduler** | 8070 | Delayed calls, campaign scheduling |
+| **Gateway** | 8081 | Nginx reverse proxy, routes all traffic |
+
+### Frontends
+
+| App | Port | Purpose |
+|-----|------|---------|
+| **Dashboard** | 8080 | Admin interface (React/Vite) |
+| **Recipient** | 3000 | Survey-taking interface with voice + text modes (Next.js) |
+
+## Quick Start
+
 ```bash
-cd itcurves_deploy
-docker-compose up -d
+# 1. Clone
+git clone https://github.com/waseem-akram-senarios/surveybot.git
+cd surveybot/itcurves_deploy
+
+# 2. Configure
+cp .env.example .env
+# Edit .env with your API keys
+
+# 3. Launch
+docker compose -f docker-compose.microservices.yml up -d --build
+
+# 4. Access
+# Dashboard:    http://localhost:8080
+# Recipient:    http://localhost:3000
+# API Gateway:  http://localhost:8081
 ```
 
-3. **Access the applications**
-- Dashboard: http://localhost:8080
-- Recipient App: http://localhost:3000
-- Backend API: http://localhost:8081/pg
+## Environment Variables
 
-### Environment Configuration
-
-Copy and configure the environment file:
-```bash
-cp itcurves_deploy/.env.example itcurves_deploy/.env
-```
-
-Required environment variables:
 ```env
 # Database
 DB_HOST=host.docker.internal
@@ -93,157 +72,98 @@ DB_PORT=5432
 DB_USER=pguser
 DB_PASSWORD=root
 
-# AI Services
-OPENAI_API_KEY=your_openai_api_key
-DEEPGRAM_API_KEY=your_deepgram_api_key
+# AI (required)
+OPENAI_API_KEY=sk-...
 
-# Voice Services
-VAPI_API_KEY=your_vapi_api_key
-PHONE_NUMBER_ID=your_phone_number_id
+# Voice calls (required for phone surveys)
+VAPI_API_KEY=...
+PHONE_NUMBER_ID=...
 
-LIVEKIT_URL=your_livekit_url
-LIVEKIT_API_KEY=your_livekit_api_key
-LIVEKIT_API_SECRET=your_livekit_api_secret
-SIP_OUTBOUND_TRUNK_ID=your_sip_trunk_id
+# Email delivery
+MAILERSEND_API_KEY=mlsn...
+MAILERSEND_SENDER_EMAIL=noreply@yourdomain.com
 
-# Email
-MAILERSEND_API_KEY=your_mailersend_api_key
-MAILERSEND_SENDER_EMAIL=your_sender_email
+# Speech-to-text (fallback)
+DEEPGRAM_API_TOKEN=...
+
+# Public URL for VAPI callbacks
+PUBLIC_URL=https://your-public-url.com
 ```
 
-## 📱 Usage
-
-### Creating a Voice Survey
-
-1. **Access the Dashboard**: http://localhost:8080
-2. **Create Survey**: Select a template or create custom questions
-3. **Add Recipient**: Enter phone number for voice survey
-4. **Choose Voice Provider**: Select VAPI or LiveKit
-5. **Launch Survey**: Start the voice call
-
-### Monitoring Results
-
-- **Real-time Status**: Track survey completion in dashboard
-- **Call Transcripts**: View voice conversation logs
-- **Analytics**: Analyze survey responses and completion rates
-- **Export Data**: Download results for reporting
-
-## 🧪 Testing
-
-Run the test suite to verify functionality:
-
-```bash
-# Run all tests
-python tests/test_voice_survey_e2e.py
-
-# Test voice clarity
-python tests/test_voice_clarity.py
-
-# Test complete workflow
-python tests/test_complete_workflow.py
-```
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 surveybot/
-├── itcurves_deploy/              # Main deployment configuration
-│   ├── docker-compose.yml       # Service orchestration
-│   ├── .env                     # Environment variables
-│   ├── pg/                      # Backend API service
-│   ├── dashboard/               # React dashboard
-│   ├── recipient/               # Next.js recipient app
-│   └── services/                # Microservices
-├── ncs_pvt-survey-backend/      # Legacy backend (deprecated)
-├── ncs_pvt-survey-frontend/     # Legacy frontend (deprecated)
-├── docs/                        # Documentation
-├── tests/                       # Test scripts
-├── screenshots/                 # Application screenshots
-└── scripts/                     # Utility scripts
+├── itcurves_deploy/                    # Main deployment
+│   ├── docker-compose.microservices.yml
+│   ├── .env.example
+│   ├── gateway/                        # Nginx config
+│   │   └── nginx.conf
+│   ├── services/
+│   │   ├── brain-service/              # AI/LLM intelligence
+│   │   │   ├── prompts.py              #   All prompts live here
+│   │   │   ├── llm.py                  #   OpenAI client wrapper
+│   │   │   ├── workflow_builder.py     #   VAPI workflow JSON generator
+│   │   │   └── routes/brain.py         #   API endpoints
+│   │   ├── voice-service/              # Voice/call management
+│   │   │   ├── vapi_client.py          #   VAPI HTTP client
+│   │   │   ├── db.py                   #   Transcript storage
+│   │   │   └── routes/voice.py         #   API endpoints
+│   │   ├── survey-service/             # Survey CRUD + answers
+│   │   ├── question-service/           # Question management
+│   │   ├── template-service/           # Template management
+│   │   ├── analytics-service/          # Metrics + export
+│   │   ├── scheduler-service/          # Job scheduling
+│   │   └── agent-service/              # Legacy (kept for compat)
+│   ├── shared/                         # Shared models/utils
+│   ├── dashboard/                      # React admin app
+│   ├── recipient/                      # Next.js survey app
+│   ├── pg/                             # Legacy monolith (deprecated)
+│   ├── schema/                         # DB migration scripts
+│   └── migrations/                     # DB migrations
+├── docs/                               # Documentation
+├── CHANGELOG.md
+└── README.md
 ```
 
-## 🔧 Development
+## Key Design Decisions
 
-### Adding New Survey Templates
+**Brain/Voice separation**: The brain-service owns all AI logic (prompts, models, parsing). The voice-service owns all VAPI call operations. You can iterate on AI intelligence by editing only `brain-service/` -- zero changes to any other service.
 
-1. Access the Template Service at http://localhost:8040
-2. Create new template with questions
-3. Set status to "Published"
-4. Use template in survey creation
+**No direct OpenAI imports outside brain-service**: Survey, question, template, and analytics services call brain-service via HTTP instead of importing OpenAI. Single point to swap models, add caching, or monitor costs.
 
-### Custom Voice Prompts
+**Backward compatibility**: The `/api/agent/*` routes still work through the voice-service's compatibility layer, so existing integrations don't break.
 
-Modify the system prompts in the voice integration:
-- VAPI: Update `systemPrompt` in call creation
-- LiveKit: Modify prompts in `livekit_agent.py`
+## API Reference
 
-### Database Schema
+All endpoints are accessed through the gateway at `http://localhost:8081/pg/api/`.
 
-The system uses PostgreSQL with the following main tables:
-- `surveys`: Survey metadata and status
-- `templates`: Survey templates
-- `questions`: Survey questions
-- `answers`: Survey responses
+### Brain Service (`/api/brain/`)
+- `POST /brain/sympathize` -- Empathetic response generation
+- `POST /brain/parse` -- Parse natural language into structured answer
+- `POST /brain/summarize` -- Summarize long responses
+- `POST /brain/translate` -- Translate text
+- `POST /brain/analyze` -- Post-survey AI analysis
+- `POST /brain/build-workflow-config` -- Generate VAPI workflow JSON
 
-## 📊 Monitoring
+### Voice Service (`/api/voice/`)
+- `POST /voice/make-call` -- Initiate VAPI phone call
+- `POST /voice/make-workflow` -- Preview workflow config
+- `GET /voice/transcript/{survey_id}` -- Get call transcript
+- `POST /voice/tool-callback` -- VAPI tool callbacks
+- `POST /voice/webhook` -- VAPI end-of-call webhook
 
-### Service Health
-- Backend API: http://localhost:8081/pg/health
-- All services expose health endpoints
+### Survey Service (`/api/surveys/`)
+- `GET /surveys/list` -- List surveys
+- `POST /surveys/generate` -- Generate from template
+- `POST /surveys/makecall` -- Trigger call via voice-service
+- `POST /answers/qna` -- Submit web answers
 
-### Logs
-- Docker logs: `docker-compose logs -f [service-name]`
-- Application logs available in respective service containers
+### Other
+- `GET /templates/list` -- List templates
+- `GET /analytics/summary` -- Dashboard metrics
+- `POST /scheduler/schedule-call` -- Schedule delayed call
 
-## 🚨 Troubleshooting
+## License
 
-### Voice Call Issues
-1. Check API keys in environment variables
-2. Verify phone number format (E.164: +1234567890)
-3. Check service logs for error details
-4. Test with different voice providers
-
-### Service Connection Issues
-1. Verify Docker containers are running: `docker ps`
-2. Check network connectivity between services
-3. Review environment configuration
-4. Restart services: `docker-compose restart`
-
-## 📝 API Documentation
-
-### Survey Endpoints
-
-- `GET /api/surveys`: List all surveys
-- `POST /api/surveys/generate`: Generate survey from template
-- `POST /api/surveys/create`: Create survey questions
-- `POST /api/surveys/make-call`: Initiate voice call
-- `GET /api/surveys/{id}/questions`: Get survey questions
-
-### Template Endpoints
-
-- `GET /api/templates/list`: List available templates
-- `POST /api/templates/create`: Create new template
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch
-3. Make changes with tests
-4. Submit pull request
-
-## 📄 License
-
-This project is proprietary software. All rights reserved.
-
-## 📞 Support
-
-For technical support:
-- Check the troubleshooting section
-- Review service logs
-- Contact the development team
-
----
-
-**System Status**: ✅ Production Ready  
-**Last Updated**: 2026-02-16  
-**Version**: 1.0.0
+Proprietary software. All rights reserved.

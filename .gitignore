@@ -7,8 +7,6 @@ auth.env
 # Logs
 *.log
 logs/
-console_log.json
-recipient_console_log.json
 
 # Database
 *.db
@@ -24,26 +22,22 @@ __pycache__/
 build/
 develop-eggs/
 dist/
-downloads/
 eggs/
 .eggs/
-lib/
-lib64/
-parts/
+*.egg-info/
+*.egg
+.installed.cfg
+wheels/
 sdist/
 var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 
 # Node.js
 node_modules/
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 .npm
 .eslintcache
+.next/
 
 # Docker
 .dockerignore
@@ -57,11 +51,6 @@ yarn-error.log*
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
 # Temporary files
@@ -75,54 +64,22 @@ htmlcov/
 .coverage
 .coverage.*
 coverage.xml
-*.cover
-.hypothesis/
 .pytest_cache/
 
-# Backup files
-*.bak
-*.backup
-*~
-
-# Test files (keep organized in tests/ directory)
-test_*.py
-simple_*.py
-debug_*.py
-fix_*.py
-final_*.py
-verify_*.py
-
-# Zip files (keep in tests/)
+# Zip files
 *.zip
 
-# JSON logs (keep in tests/)
-*.json
-
-# Screenshots (keep organized)
-screenshot_*.png
-
-# Documentation build
-docs/_build/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
+# Redis dump
+dump.rdb
 
 # Environments
 venv/
 env/
 ENV/
 
-# Redis dump
-dump.rdb
+# Jupyter
+.ipynb_checkpoints
 
-# PostgreSQL
-*.sql
-
-# LiveKit recordings
+# Recordings
 recordings/
-
-# VAPI recordings
 vapi_recordings/

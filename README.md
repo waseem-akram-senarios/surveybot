@@ -1,4 +1,4 @@
-# SurvAI Platform - AI-Powered Survey System
+# Survey Bot - AI-Powered Survey System
 
 An AI-powered survey platform that conducts intelligent phone and web surveys using natural conversation. Built with a microservices architecture for scalability and independent deployability.
 

@@ -1,0 +1,21 @@
+{
+  "name": "e2e-tests",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:api": "npx playwright test --project=api-health",
+    "test:dashboard": "npx playwright test --project=dashboard",
+    "test:templates": "npx playwright test --project=templates",
+    "test:surveys": "npx playwright test --project=surveys",
+    "test:recipient": "npx playwright test --project=recipient",
+    "report": "npx playwright show-report"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
+  }
+}

@@ -12,6 +12,7 @@ from typing import List, Optional
 import httpx
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from mailersend import EmailBuilder, MailerSendClient
+from pydantic import BaseModel
 
 from shared.models.common import (
     CallbackRequest,
@@ -796,6 +797,42 @@ async def delete_survey(survey_id: str):
 async def sendemail_alias(email: Email):
     """Alias: /surveys/email -> /surveys/sendemail (dashboard expects this)."""
     return await sendemail(email)
+
+
+class SMSRequest(BaseModel):
+    phone: str
+    survey_id: str
+    survey_url: Optional[str] = None
+    rider_name: Optional[str] = None
+    language: str = "en"
+
+
+@router.post("/surveys/sendsms")
+async def send_sms_survey(request: SMSRequest):
+    """Send SMS with survey link - backup for missed calls."""
+    from sms import send_survey_link_sms
+    
+    survey_url = request.survey_url
+    if not survey_url:
+        survey_url = f"{os.getenv('RECIPIENT_URL', 'http://localhost:8080')}/survey/{request.survey_id}"
+    
+    result = send_survey_link_sms(
+        to_phone=request.phone,
+        survey_url=survey_url,
+        rider_name=request.rider_name,
+        language=request.language
+    )
+    
+    if result.get("success"):
+        return {"status": "sent", "message_sid": result.get("message_sid")}
+    else:
+        raise HTTPException(status_code=500, detail=result.get("error", "SMS send failed"))
+
+
+@router.post("/surveys/sms")
+async def send_sms_alias(request: SMSRequest):
+    """Alias: /surveys/sms -> /surveys/sendsms."""
+    return await send_sms_survey(request)
 
 
 @router.post("/surveys/make-call")

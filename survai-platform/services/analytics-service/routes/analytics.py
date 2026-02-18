@@ -213,3 +213,235 @@ async def analyze_survey(survey_id: str):
     except Exception as e:
         logger.error(f"Analyze survey error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Demand Fulfillment Tracking ─────────────────────────────────────────────
+
+@router.get("/demand-fulfillment/{tenant_id}")
+async def get_demand_fulfillment(tenant_id: str, days: int = 30):
+    """Get demand fulfillment rate for a tenant over specified days."""
+    try:
+        rows = sql_execute(
+            """SELECT date, total_requests, fulfilled_requests, fulfillment_rate, avg_wait_time_minutes
+               FROM demand_fulfillment
+               WHERE tenant_id = :tenant_id
+               AND date >= CURRENT_DATE - :days
+               ORDER BY date DESC""",
+            {"tenant_id": tenant_id, "days": days},
+        )
+        
+        if not rows:
+            return {
+                "tenant_id": tenant_id,
+                "period_days": days,
+                "data": [],
+                "avg_fulfillment_rate": 0,
+                "total_requests": 0,
+                "total_fulfilled": 0
+            }
+        
+        total_requests = sum(r.get("total_requests", 0) for r in rows)
+        total_fulfilled = sum(r.get("fulfilled_requests", 0) for r in rows)
+        avg_rate = (total_fulfilled / total_requests * 100) if total_requests > 0 else 0
+        
+        return {
+            "tenant_id": tenant_id,
+            "period_days": days,
+            "data": rows,
+            "avg_fulfillment_rate": round(avg_rate, 2),
+            "total_requests": total_requests,
+            "total_fulfilled": total_fulfilled
+        }
+    except Exception as e:
+        logger.error(f"Demand fulfillment error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/demand-fulfillment")
+async def record_demand_fulfillment(
+    tenant_id: str,
+    date: str,
+    total_requests: int,
+    fulfilled_requests: int,
+    avg_wait_time_minutes: Optional[int] = None
+):
+    """Record daily demand fulfillment data for a tenant."""
+    try:
+        fulfillment_rate = (fulfilled_requests / total_requests * 100) if total_requests > 0 else 0
+        
+        sql_execute(
+            """INSERT INTO demand_fulfillment 
+               (tenant_id, date, total_requests, fulfilled_requests, fulfillment_rate, avg_wait_time_minutes)
+               VALUES (:tenant_id, :date, :total_requests, :fulfilled_requests, :fulfillment_rate, :avg_wait_time)
+               ON CONFLICT (tenant_id, date) DO UPDATE SET
+                 total_requests = EXCLUDED.total_requests,
+                 fulfilled_requests = EXCLUDED.fulfilled_requests,
+                 fulfillment_rate = EXCLUDED.fulfillment_rate,
+                 avg_wait_time_minutes = EXCLUDED.avg_wait_time_minutes""",
+            {
+                "tenant_id": tenant_id,
+                "date": date,
+                "total_requests": total_requests,
+                "fulfilled_requests": fulfilled_requests,
+                "fulfillment_rate": round(fulfillment_rate, 2),
+                "avg_wait_time": avg_wait_time_minutes
+            },
+        )
+        return {"status": "recorded", "fulfillment_rate": round(fulfillment_rate, 2)}
+    except Exception as e:
+        logger.error(f"Record demand fulfillment error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Incentive Tracking (Gift Cards) ─────────────────────────────────────────
+
+@router.get("/incentives/{tenant_id}")
+async def get_incentives(tenant_id: str, campaign_id: Optional[str] = None):
+    """Get incentive/gift card issuance for a tenant."""
+    try:
+        if campaign_id:
+            rows = sql_execute(
+                """SELECT * FROM incentive_tracking
+                   WHERE tenant_id = :tenant_id AND campaign_id = :campaign_id
+                   ORDER BY issued_at DESC""",
+                {"tenant_id": tenant_id, "campaign_id": campaign_id},
+            )
+        else:
+            rows = sql_execute(
+                """SELECT * FROM incentive_tracking
+                   WHERE tenant_id = :tenant_id
+                   ORDER BY issued_at DESC""",
+                {"tenant_id": tenant_id},
+            )
+        
+        total_issued = len(rows)
+        total_redeemed = sum(1 for r in rows if r.get("status") == "redeemed")
+        total_value = sum(float(r.get("incentive_value") or 0) for r in rows)
+        
+        return {
+            "tenant_id": tenant_id,
+            "campaign_id": campaign_id,
+            "incentives": rows,
+            "total_issued": total_issued,
+            "total_redeemed": total_redeemed,
+            "total_value": round(total_value, 2)
+        }
+    except Exception as e:
+        logger.error(f"Get incentives error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/incentives/issue")
+async def issue_incentive(
+    rider_phone: str,
+    tenant_id: str,
+    incentive_type: str = "gift_card",
+    incentive_value: float = 5.0,
+    survey_id: Optional[str] = None,
+    campaign_id: Optional[str] = None,
+    rider_name: Optional[str] = None,
+    rider_email: Optional[str] = None
+):
+    """
+    Issue an incentive to a rider. Prevents duplicates per campaign.
+    Returns error if rider already received incentive for this campaign.
+    """
+    try:
+        # Check for duplicate
+        existing = sql_execute(
+            """SELECT * FROM incentive_tracking
+               WHERE rider_phone = :phone AND campaign_id = :campaign_id""",
+            {"phone": rider_phone, "campaign_id": campaign_id},
+        )
+        
+        if existing:
+            return {
+                "status": "duplicate",
+                "message": f"Rider {rider_phone} already received incentive for this campaign",
+                "existing_incentive": existing[0]
+            }
+        
+        # Issue new incentive
+        sql_execute(
+            """INSERT INTO incentive_tracking
+               (rider_phone, rider_email, rider_name, incentive_type, incentive_value, 
+                survey_id, campaign_id, tenant_id, status)
+               VALUES (:phone, :email, :name, :type, :value, :survey_id, :campaign_id, :tenant_id, 'issued')""",
+            {
+                "phone": rider_phone,
+                "email": rider_email,
+                "name": rider_name,
+                "type": incentive_type,
+                "value": incentive_value,
+                "survey_id": survey_id,
+                "campaign_id": campaign_id,
+                "tenant_id": tenant_id
+            },
+        )
+        
+        return {
+            "status": "issued",
+            "rider_phone": rider_phone,
+            "incentive_type": incentive_type,
+            "incentive_value": incentive_value
+        }
+    except Exception as e:
+        logger.error(f"Issue incentive error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/incentives/redeem")
+async def redeem_incentive(rider_phone: str, campaign_id: str):
+    """Mark an incentive as redeemed."""
+    try:
+        existing = sql_execute(
+            """SELECT * FROM incentive_tracking
+               WHERE rider_phone = :phone AND campaign_id = :campaign_id""",
+            {"phone": rider_phone, "campaign_id": campaign_id},
+        )
+        
+        if not existing:
+            raise HTTPException(status_code=404, detail="Incentive not found")
+        
+        if existing[0].get("status") == "redeemed":
+            return {"status": "already_redeemed", "redeemed_at": existing[0].get("redeemed_at")}
+        
+        sql_execute(
+            """UPDATE incentive_tracking
+               SET status = 'redeemed', redeemed_at = NOW()
+               WHERE rider_phone = :phone AND campaign_id = :campaign_id""",
+            {"phone": rider_phone, "campaign_id": campaign_id},
+        )
+        
+        return {"status": "redeemed", "rider_phone": rider_phone}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Redeem incentive error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/incentives/check/{rider_phone}")
+async def check_rider_incentive(rider_phone: str, campaign_id: Optional[str] = None):
+    """Check if a rider has already received an incentive."""
+    try:
+        if campaign_id:
+            rows = sql_execute(
+                """SELECT * FROM incentive_tracking
+                   WHERE rider_phone = :phone AND campaign_id = :campaign_id""",
+                {"phone": rider_phone, "campaign_id": campaign_id},
+            )
+        else:
+            rows = sql_execute(
+                """SELECT * FROM incentive_tracking WHERE rider_phone = :phone""",
+                {"phone": rider_phone},
+            )
+        
+        return {
+            "rider_phone": rider_phone,
+            "has_incentive": len(rows) > 0,
+            "incentives": rows
+        }
+    except Exception as e:
+        logger.error(f"Check incentive error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

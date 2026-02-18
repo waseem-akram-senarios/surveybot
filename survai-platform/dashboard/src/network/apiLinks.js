@@ -51,6 +51,20 @@ class ApiLinks {
     static SCHEDULE_CALLBACK = '/api/surveys/callback';
     static SCHEDULE_CALL = '/api/scheduler/schedule-call';
     static SCHEDULE_CAMPAIGN = '/api/scheduler/schedule-campaign';
+
+    // SMS endpoints
+    static SURVEY_SEND_SMS = '/api/surveys/sendsms';
+    static SURVEY_SMS = '/api/surveys/sms';
+
+    // Demand Fulfillment endpoints
+    static DEMAND_FULFILLMENT = (tenantId) => `/api/analytics/demand-fulfillment/${tenantId}`;
+    static RECORD_DEMAND_FULFILLMENT = '/api/analytics/demand-fulfillment';
+
+    // Incentive/Gift Card tracking endpoints
+    static INCENTIVES = (tenantId) => `/api/analytics/incentives/${tenantId}`;
+    static ISSUE_INCENTIVE = '/api/analytics/incentives/issue';
+    static REDEEM_INCENTIVE = '/api/analytics/incentives/redeem';
+    static CHECK_INCENTIVE = (riderPhone) => `/api/analytics/incentives/check/${riderPhone}`;
 }
   
 export default ApiLinks;

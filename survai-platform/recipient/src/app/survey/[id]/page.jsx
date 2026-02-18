@@ -3,6 +3,7 @@ import { Box, Typography, Grid, Button, CircularProgress, Card } from "@mui/mate
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Background from '../../../../public/StartBackground.svg'
+import { detectLanguage, t } from '../../../lib/i18n';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -13,6 +14,7 @@ export default function Survey() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [recipientName, setRecipientName] = useState("");
+  const [lang, setLang] = useState("en");
 
   const fetchRecipientInfo = async () => {
     if (!id) return;
@@ -35,6 +37,9 @@ export default function Survey() {
       const result = await response.json();
       console.log("Fetching recipient info for survey ID:", result);
       setRecipientName(result.Recipient);
+      if (result.Name) {
+        setLang(detectLanguage(result.Name));
+      }
     } catch (error) {
       console.error("Error fetching recipient info:", error);
       setError("Failed to load survey");
@@ -150,7 +155,7 @@ export default function Survey() {
             color: "#929292",
           }}
         >
-          Customer Satisfaction Survey
+          {t('customerSurvey', lang)}
         </Typography>
       </Box>
 
@@ -184,7 +189,7 @@ export default function Survey() {
               mb: 3,
             }}
           >
-            Hello, {recipientName} 👋
+            {t('hello', lang)}, {recipientName} 👋
           </Typography>
           
           <Typography
@@ -197,9 +202,7 @@ export default function Survey() {
               mb: 4,
             }}
           >
-            Welcome to the Customer Satisfaction Survey. We appreciate you
-            taking the time to fill this survey out. Click the start button to
-            begin the survey
+            {t('welcome', lang)} {t('customerSurvey', lang)}.
           </Typography>
           
           <Button
@@ -219,7 +222,7 @@ export default function Survey() {
               boxShadow: "0 4px 12px rgba(66, 133, 244, 0.3)",
             }}
           >
-            Start Survey
+            {lang === 'es' ? 'Iniciar Encuesta' : 'Start Survey'}
           </Button>
         </Card>
       </Box>

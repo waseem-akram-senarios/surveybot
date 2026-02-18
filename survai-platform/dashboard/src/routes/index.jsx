@@ -15,6 +15,7 @@ import CreateSurvey from '../pages/main/Surveys/CreateSurvey';
 import GeneratedSurveyView from '../pages/main/Surveys/GeneratedSurveyView';
 import SurveyProgressPage from '../pages/main/Surveys/SurveyProgressPage';
 import SurveyQuestionAnalytics from '../pages/main/Templates/TemplateAnalytics';
+import ImportData from '../pages/main/Surveys/ImportData';
 
 const routes = [
     {
@@ -91,6 +92,12 @@ const routes = [
           path: '/templates/create/analytics',
           element: (
               <SurveyQuestionAnalytics />
+          )
+        },
+        {
+          path: '/surveys/import',
+          element: (
+              <ImportData />
           )
         },
       ]

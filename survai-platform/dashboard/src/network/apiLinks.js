@@ -32,6 +32,10 @@ class ApiLinks {
     static SURVEY_CREATE = '/api/surveys/create';
     static SURVEY_DELETE = (surveyId) => `/api/surveys/${surveyId}`;
     static SURVEY_QUESTIONS = (surveyId) => `/api/surveys/${surveyId}/questions`;
+
+    // Import endpoints
+    static IMPORT_RIDERS = '/api/import/riders';
+    static IMPORT_BULK_SURVEYS = '/api/import/bulk-surveys';
 }
   
 export default ApiLinks;

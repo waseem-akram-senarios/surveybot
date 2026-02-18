@@ -1,6 +1,11 @@
 "use client"
-import { Box, Typography, Grid, Button, LinearProgress, Card, CardContent, styled } from '@mui/material';
+import { Box, Typography, Grid, Button, LinearProgress, Card, CardContent, styled, CircularProgress } from '@mui/material';
 import Header from '../../../../../components/Header';
+import { useParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { detectLanguage, t } from '../../../../lib/i18n';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 const StartButton = styled(Button)(({ theme }) => ({
     borderRadius: 8,
@@ -14,11 +19,25 @@ const StartButton = styled(Button)(({ theme }) => ({
       boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
     },
   }));
-import { useParams } from "next/navigation";
 
 export default function StartPage() {
   const params = useParams();
-  const surveyId = params?.id || "101"; 
+  const surveyId = params?.id || "101";
+  const [lang, setLang] = useState("en");
+
+  useEffect(() => {
+    const fetchLang = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/surveys/${surveyId}/recipient`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.Name) setLang(detectLanguage(data.Name));
+        }
+      } catch (e) { /* fallback to English */ }
+    };
+    fetchLang();
+  }, [surveyId]);
+
   return (
     <Box p={{ xs: 2, md: 8 }}>
       <Header />
@@ -39,7 +58,7 @@ export default function StartPage() {
               textAlign: "left",
             }}
           >
-            Before we begin, how would you like to take this survey?
+            {t('chooseMode', lang)}
           </Typography>
           <Typography
             sx={{
@@ -50,7 +69,7 @@ export default function StartPage() {
               textAlign: "left",
             }}
           >
-            Choose the option that works best for you:
+            {lang === 'es' ? 'Elija la opción que mejor le convenga:' : 'Choose the option that works best for you:'}
           </Typography>
 
           <Grid
@@ -78,7 +97,7 @@ export default function StartPage() {
                       textAlign: "left",
                     }}
                   >
-                    Normal Survey
+                    {t('textSurvey', lang)}
                   </Typography>
                   <Typography
                     sx={{
@@ -90,7 +109,7 @@ export default function StartPage() {
                       mb: 3,
                     }}
                   >
-                    Answer the questions through a simple survey interface. Ideal if you prefer to fill survey in traditional format.
+                    {t('textDesc', lang)}
                   </Typography>
                   <Button
                     variant="outlined"
@@ -114,7 +133,7 @@ export default function StartPage() {
                       },
                     }}
                   >
-                    Start Normal Survey
+                    {lang === 'es' ? 'Iniciar Encuesta de Texto' : 'Start Normal Survey'}
                   </Button>
                 </CardContent>
               </Card>
@@ -138,7 +157,7 @@ export default function StartPage() {
                       textAlign: "left",
                     }}
                   >
-                    Voice-Based Survey
+                    {t('voiceSurvey', lang)}
                   </Typography>
                   <Typography
                     sx={{
@@ -150,8 +169,7 @@ export default function StartPage() {
                       mb: 3,
                     }}
                   >
-                    Respond to each question using your voice. Great for when
-                    you’re on the go or just prefer speaking.
+                    {t('voiceDesc', lang)}
                   </Typography>
                   <Button
                     variant="outlined"
@@ -174,7 +192,7 @@ export default function StartPage() {
                       },
                     }}
                   >
-                    Start Voice Survey
+                    {lang === 'es' ? 'Iniciar Encuesta por Voz' : 'Start Voice Survey'}
                   </Button>
                 </CardContent>
               </Card>

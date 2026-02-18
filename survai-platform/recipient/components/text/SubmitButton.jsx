@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Button } from "@mui/material";
 
-const SubmitButton = ({ isSubmitting, onSubmitClick }) => {
+const SubmitButton = ({ isSubmitting, onSubmitClick, label }) => {
   return (
     <Box sx={{ display: 'flex', justifyContent: "center" }}>
       <Button
@@ -30,7 +30,7 @@ const SubmitButton = ({ isSubmitting, onSubmitClick }) => {
           },
         }}
       >
-        Submit Survey
+        {label || 'Submit Survey'}
       </Button>
     </Box>
   );

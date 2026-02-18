@@ -21,6 +21,7 @@ import {
   updateSurveyStatus,
   updateSurveyDuration,
 } from "../../../../lib/surveyApi.js";
+import { detectLanguage, t } from '../../../../lib/i18n';
 import {
   hasUnansweredQuestions,
   calculateProgress,
@@ -54,6 +55,7 @@ export default function TextSurveyPage() {
   const [sessionStartTime, setSessionStartTime] = useState(null);
   const [surveyDuration, setSurveyDuration] = useState(0);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [lang, setLang] = useState("en");
 
   // Helper function to check if a question should be visible based on parent conditions
   const shouldQuestionBeVisible = (question, currentAnswers) => {
@@ -127,6 +129,11 @@ export default function TextSurveyPage() {
         const data = await getSurveyQuestions(surveyId);
         console.log("Loaded survey data:", data);
         setSurveyData(data);
+
+        // Detect language from template name
+        if (data && data.TemplateName) {
+          setLang(detectLanguage(data.TemplateName));
+        }
 
         if (data && data.Questions) {
           const initializedQuestions = data.Questions.map(question => ({
@@ -374,7 +381,7 @@ export default function TextSurveyPage() {
               textAlign: 'center',
             }}
           >
-            Submitting your survey...
+            {lang === 'es' ? 'Enviando su encuesta...' : 'Submitting your survey...'}
           </Typography>
           <Typography 
             variant="body2" 
@@ -385,7 +392,7 @@ export default function TextSurveyPage() {
               textAlign: 'center',
             }}
           >
-            Please wait while we save your responses
+            {t('pleaseWait', lang)}
           </Typography>
         </Box>
       </Backdrop>
@@ -412,7 +419,7 @@ export default function TextSurveyPage() {
         {submissionSuccess && (
           <Box sx={{ mb: 2, display: "flex", justifyContent: "center" }}>
             <Alert severity="success" sx={{ maxWidth: "600px" }}>
-              Survey submitted successfully! Thank you for your participation.
+              {t('surveyComplete', lang)}
             </Alert>
           </Box>
         )}
@@ -505,13 +512,14 @@ export default function TextSurveyPage() {
               },
             }}
           >
-            Previous
+            {t('previous', lang)}
           </Button>
 
           {isLastQuestion ? (
             <SubmitButton
               isSubmitting={isSubmitting}
               onSubmitClick={handleSubmitClick}
+              label={t('submit', lang)}
             />
           ) : (
             <Button
@@ -536,7 +544,7 @@ export default function TextSurveyPage() {
                 },
               }}
             >
-              Next
+              {t('next', lang)}
             </Button>
           )}
         </Box>

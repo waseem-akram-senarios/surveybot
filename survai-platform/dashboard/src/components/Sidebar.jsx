@@ -289,6 +289,15 @@ const Sidebar = () => {
                 <FiberManualRecord sx={{ color: isActive('/surveys/completed') ? '#1958F7' : '#7D7D7D', fontSize: 8, mr: 1 }} />
                 <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontWeight: 500, fontSize: '14px', color: isActive('/surveys/completed') ? '#1958F7' : '#7D7D7D' }}>Completed Surveys</Typography>
               </Button>
+              
+              <Button 
+                component={Link} 
+                to="/surveys/import" 
+                sx={{ width: '100%', justifyContent: 'flex-start', pl: 6, mx: 1, borderRadius: 1, textTransform: 'none', py: 1 }}
+              >
+                <FiberManualRecord sx={{ color: isActive('/surveys/import') ? '#1958F7' : '#7D7D7D', fontSize: 8, mr: 1 }} />
+                <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontWeight: 500, fontSize: '14px', color: isActive('/surveys/import') ? '#1958F7' : '#7D7D7D' }}>Import Data</Typography>
+              </Button>
             </Box>
           </Collapse>
         )}

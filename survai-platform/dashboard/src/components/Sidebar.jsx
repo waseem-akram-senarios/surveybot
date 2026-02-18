@@ -7,13 +7,17 @@ import {
   Button,
   Collapse,
   Box,
-  IconButton
+  IconButton,
+  Divider
 } from '@mui/material';
 import {
   Add,
   FiberManualRecord,
-  KeyboardArrowDown
+  KeyboardArrowDown,
+  Logout,
+  Person
 } from '@mui/icons-material';
+import { useAuth } from '../context/AuthContext';
 import Survey from '../assets/survey.svg';
 import SelectedSurvey from '../assets/selectedSurvey.svg';
 import Dashboard from '../assets/dashboard.svg';
@@ -28,10 +32,16 @@ const Sidebar = () => {
   const minimizedWidth = 80;
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const [templatesOpen, setTemplatesOpen] = useState(true);
   const [surveysOpen, setSurveysOpen] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   useEffect(() => {
     if (location.pathname.startsWith('/templates')) {
@@ -330,6 +340,40 @@ const Sidebar = () => {
           </Button>
         </Box>
       )}
+
+      {/* User Info & Logout */}
+      <Box sx={{ mt: 'auto', p: 2 }}>
+        <Divider sx={{ mb: 2 }} />
+        {!isMinimized && user && (
+          <Box sx={{ mb: 2, px: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Person sx={{ color: '#7d7d7d', fontSize: 20 }} />
+              <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontSize: '13px', fontWeight: 500, color: '#333' }}>
+                {user.username}
+              </Typography>
+            </Box>
+            <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontSize: '11px', color: '#999', pl: 3.5 }}>
+              {user.orgName || user.tenantId}
+            </Typography>
+          </Box>
+        )}
+        <Button
+          onClick={handleLogout}
+          startIcon={!isMinimized && <Logout />}
+          sx={{
+            width: '100%',
+            justifyContent: isMinimized ? 'center' : 'flex-start',
+            color: '#d32f2f',
+            textTransform: 'none',
+            borderRadius: '10px',
+            fontFamily: 'Poppins, sans-serif',
+            fontSize: '14px',
+            '&:hover': { backgroundColor: '#ffebee' },
+          }}
+        >
+          {isMinimized ? <Logout /> : 'Logout'}
+        </Button>
+      </Box>
     </Drawer>
   );
 };

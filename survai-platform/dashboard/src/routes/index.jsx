@@ -1,7 +1,8 @@
 import { useRoutes, Navigate } from 'react-router-dom';
 
 import MainLayout from '../layout/MainLayout';
-
+import ProtectedRoute from '../components/ProtectedRoute';
+import Login from '../pages/Login';
 import NotFound from '../pages/NotFound';
 
 // Import survey-related components
@@ -19,6 +20,10 @@ import ImportData from '../pages/main/Surveys/ImportData';
 
 const routes = [
     {
+      path: '/login',
+      element: <Login />
+    },
+    {
       path: '/',
       children: [
         { path: '/', element: <Navigate to="/dashboard" /> }
@@ -26,7 +31,11 @@ const routes = [
     },
     {
       path: '/',
-      element: <MainLayout />,
+      element: (
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      ),
       children: [
         {
           path: '/dashboard',

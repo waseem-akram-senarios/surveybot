@@ -36,6 +36,21 @@ class ApiLinks {
     // Import endpoints
     static IMPORT_RIDERS = '/api/import/riders';
     static IMPORT_BULK_SURVEYS = '/api/import/bulk-surveys';
+
+    // Export endpoints
+    static EXPORT_SURVEYS = '/api/export/surveys';
+    static EXPORT_TRANSCRIPTS = '/api/export/transcripts';
+    static EXPORT_CAMPAIGN = (campaignId) => `/api/export/campaign/${campaignId}`;
+    static EXPORT_SURVEY_RESPONSES = (surveyId) => `/api/export/survey/${surveyId}/responses`;
+
+    // Analytics endpoints
+    static ANALYTICS_SUMMARY = '/api/analytics/summary';
+    static ANALYTICS_CAMPAIGN = (campaignId) => `/api/analytics/campaign/${campaignId}`;
+
+    // Callback/Scheduling endpoints
+    static SCHEDULE_CALLBACK = '/api/surveys/callback';
+    static SCHEDULE_CALL = '/api/scheduler/schedule-call';
+    static SCHEDULE_CAMPAIGN = '/api/scheduler/schedule-campaign';
 }
   
 export default ApiLinks;

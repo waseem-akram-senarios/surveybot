@@ -318,18 +318,66 @@ def _build_tts():
     )
 
 
+# ─── Sandbox demo mode ───────────────────────────────────────────────────────
+
+SANDBOX_PROMPT = f"""You are Cameron, a warm and friendly AI survey assistant from {ORGANIZATION_NAME}.
+
+You're speaking with someone who connected via the web browser. Since this is a live demo, introduce yourself and explain that you're a voice AI agent that conducts conversational surveys over the phone.
+
+If they want to try a demo conversation, have a natural friendly chat. Ask them a few example questions like:
+- How their day is going
+- What they think about AI voice assistants
+- Rate their experience talking to you on a scale of 1 to 5
+
+Be conversational, empathetic, and natural. Don't sound robotic. Keep it brief and fun.
+End by saying they can use this technology to conduct real surveys by connecting it to their survey platform."""
+
+
+async def _run_sandbox_mode(ctx: JobContext):
+    """Handle sandbox/browser connections without survey data."""
+    logger.info(f"Sandbox mode: room={ctx.room.name}")
+
+    agent = Agent(instructions=SANDBOX_PROMPT)
+
+    session = AgentSession(
+        vad=silero.VAD.load(),
+        stt=deepgram.STT(model="nova-3"),
+        tts=_build_tts(),
+        llm=openai.LLM(model="gpt-4o-mini", temperature=0.7),
+    )
+
+    await session.start(agent=agent, room=ctx.room)
+
+
 # ─── Entrypoint ──────────────────────────────────────────────────────────────
 
 async def entrypoint(ctx: JobContext):
-    """Main entrypoint for the LiveKit agent worker."""
+    """Main entrypoint for the LiveKit agent worker.
+
+    Two modes:
+    - Phone call mode: dispatched with metadata {phone_number, survey_id}
+    - Sandbox/browser mode: no metadata or no phone_number, just chat
+    """
     logger.info(f"Connecting to room {ctx.room.name}")
     await ctx.connect()
 
-    metadata = json.loads(ctx.job.metadata)
-    phone_number = metadata["phone_number"]
-    survey_id = metadata["survey_id"]
-    participant_identity = f"sip_{phone_number}"
+    # Parse metadata -- sandbox connections may have none
+    metadata = {}
+    try:
+        raw = ctx.job.metadata
+        if raw:
+            metadata = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        pass
 
+    phone_number = metadata.get("phone_number")
+    survey_id = metadata.get("survey_id")
+
+    if not phone_number or not survey_id:
+        await _run_sandbox_mode(ctx)
+        return
+
+    participant_identity = f"sip_{phone_number}"
     logger.info(f"Starting survey call: survey={survey_id}, phone={phone_number}")
 
     # 1. Fetch survey data from backend

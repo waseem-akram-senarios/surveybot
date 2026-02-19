@@ -14,7 +14,7 @@ import {
   Box,
   IconButton,
 } from '@mui/material';
-import { truncateText, handleUrlClick, formatDate } from '../../../utils/Surveys/surveyTableHelpers';
+import { truncateText, formatDate } from '../../../utils/Surveys/surveyTableHelpers';
 import SendSurveyButton from '../../../assets/SendSurvey.svg';
 
 const DesktopTable = ({ 
@@ -110,8 +110,12 @@ const DesktopTable = ({
               <TableCell>{formatDate(item.LaunchDate)}</TableCell>
               <TableCell>
                 {item.URL ? (
-                  <Typography
-                    sx={{
+                  <a
+                    href={item.URL.startsWith("http") ? item.URL : `https://${item.URL}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
                       color: item.Status === "Completed" ? "#D32F2F" : "#1958F7",
                       textDecoration: "underline",
                       cursor: "pointer",
@@ -121,10 +125,9 @@ const DesktopTable = ({
                       lineHeight: "100%",
                       display: "inline-block",
                     }}
-                    onClick={(e) => handleUrlClick(item.URL, item.Status, e)}
                   >
                     {truncateText(item.URL, 40)}
-                  </Typography>
+                  </a>
                 ) : (
                   <Typography
                     sx={{

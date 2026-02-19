@@ -7,7 +7,7 @@ import {
   Button,
   IconButton,
 } from '@mui/material';
-import { formatDate, handleUrlClick } from '../../../utils/Surveys/surveyTableHelpers';
+import { formatDate } from '../../../utils/Surveys/surveyTableHelpers';
 import SendSurveyButton from '../../../assets/SendSurvey.svg';
 
 const MobileTableCard = ({ item, onItemClick, onSendEmail }) => {
@@ -100,27 +100,39 @@ const MobileTableCard = ({ item, onItemClick, onSendEmail }) => {
         }}>
           URL
         </Typography>
-        <Typography
-          sx={{
-            color: item.URL
-              ? item.Status === "Completed"
-                ? "#D32F2F"
-                : "#1958F7"
-              : "#9A9EA5",
-            textDecoration: item.URL ? "underline" : "none",
-            cursor: item.URL ? "pointer" : "default",
-            fontFamily: "Poppins, sans-serif",
-            fontWeight: 400,
-            fontSize: "13px",
-            maxWidth: "60%",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap"
-          }}
-          onClick={(e) => handleUrlClick(item.URL, item.Status, e)}
-        >
-          {item.URL || "No URL"}
-        </Typography>
+        {item.URL ? (
+          <a
+            href={item.URL.startsWith("http") ? item.URL : `https://${item.URL}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              color: item.Status === "Completed" ? "#D32F2F" : "#1958F7",
+              textDecoration: "underline",
+              fontFamily: "Poppins, sans-serif",
+              fontWeight: 400,
+              fontSize: "13px",
+              maxWidth: "60%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              display: "inline-block",
+            }}
+          >
+            {item.URL}
+          </a>
+        ) : (
+          <Typography
+            sx={{
+              color: "#9A9EA5",
+              fontFamily: "Poppins, sans-serif",
+              fontWeight: 400,
+              fontSize: "13px",
+            }}
+          >
+            No URL
+          </Typography>
+        )}
       </Box>
 
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>

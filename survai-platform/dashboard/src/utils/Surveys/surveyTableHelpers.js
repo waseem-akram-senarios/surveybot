@@ -57,13 +57,7 @@ export const handleUrlClick = (url, status, e) => {
     finalUrl = "https://" + url;
   }
 
-  const link = document.createElement("a");
-  link.href = finalUrl;
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  window.open(finalUrl, "_blank", "noopener,noreferrer");
 };
 
 export const filterData = (data, searchTerm) => {

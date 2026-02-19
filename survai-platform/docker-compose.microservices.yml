@@ -1,6 +1,5 @@
 # Microservices Docker Compose -- fully containerized stack
 # Usage: docker compose -f docker-compose.microservices.yml up --build
-# To also run livekit-agent: docker compose -f docker-compose.microservices.yml --profile livekit up --build
 #
 # Single entry point: http://localhost:8080
 #   - Dashboard (admin UI):   http://localhost:8080/
@@ -212,6 +211,9 @@ services:
       - MAILERSEND_SENDER_EMAIL=${MAILERSEND_SENDER_EMAIL}
       - BRAIN_SERVICE_URL=http://brain-service:8016
       - SURVEY_SUBMIT_URL=${PUBLIC_URL}/pg/api/answers/qna_phone
+      - LIVEKIT_URL=${LIVEKIT_URL}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
     depends_on:
       postgres:
         condition: service_healthy
@@ -319,7 +321,7 @@ services:
       timeout: 5s
       retries: 3
 
-  # ─── LiveKit Agent (optional) ───────────────────────────────────────────────
+  # ─── LiveKit Agent (voice survey caller) ────────────────────────────────────
 
   livekit-agent:
     build:
@@ -336,7 +338,11 @@ services:
       - SIP_OUTBOUND_TRUNK_ID=${SIP_OUTBOUND_TRUNK_ID}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY}
+      - ELEVEN_API_KEY=${ELEVEN_API_KEY}
+      - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID}
+      - ORGANIZATION_NAME=${ORGANIZATION_NAME:-IT Curves}
       - BACKEND_URL=http://survey-service:8020
+      - BRAIN_SERVICE_URL=http://brain-service:8016
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${DB_USER}
@@ -346,8 +352,8 @@ services:
         condition: service_healthy
       survey-service:
         condition: service_started
-    profiles:
-      - livekit
+      brain-service:
+        condition: service_started
 
   # ─── Dashboard Microservice (admin UI) ─────────────────────────────────────
 

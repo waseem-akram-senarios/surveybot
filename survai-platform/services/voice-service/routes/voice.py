@@ -72,19 +72,10 @@ async def make_call(
     """
     Initiate an AI-powered survey call.
 
-    1. Load survey + questions from DB
-    2. Ask brain-service to build the workflow config
-    3. Create workflow in VAPI
-    4. Make the outbound call
+    Supports two providers:
+    - vapi: VAPI workflow-based calls
+    - livekit: LiveKit agent-based calls via SIP
     """
-    api_key = os.getenv("VAPI_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="VAPI_API_KEY not configured")
-
-    phone_number_id = os.getenv("PHONE_NUMBER_ID")
-    if not phone_number_id:
-        raise HTTPException(status_code=500, detail="PHONE_NUMBER_ID not configured")
-
     survey = get_survey_with_questions(survey_id)
     if not survey:
         raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
@@ -93,8 +84,44 @@ async def make_call(
     if not questions:
         raise HTTPException(status_code=400, detail="Survey has no questions")
 
-    if provider != "vapi":
-        raise HTTPException(status_code=400, detail=f"Provider '{provider}' not supported. Use 'vapi'.")
+    # ─── LiveKit provider ────────────────────────────────────────────────
+    if provider == "livekit":
+        livekit_url = os.getenv("LIVEKIT_URL", "")
+        if not livekit_url:
+            raise HTTPException(status_code=500, detail="LIVEKIT_URL not configured")
+
+        try:
+            from livekit_dispatcher import dispatch_livekit_call
+            result = await dispatch_livekit_call(phone_number=phone, survey_id=survey_id)
+
+            call_id = result.get("call_id", "")
+            if call_id:
+                try:
+                    sql_execute(
+                        "UPDATE surveys SET call_id = :call_id WHERE id = :sid",
+                        {"call_id": call_id, "sid": survey_id},
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to save LiveKit call_id: {e}")
+
+            return {
+                "status": "call_initiated",
+                "call_id": call_id,
+                "survey_id": survey_id,
+                "provider": "livekit",
+            }
+        except Exception as e:
+            logger.error(f"LiveKit call failed: {e}")
+            raise HTTPException(status_code=500, detail=f"LiveKit call failed: {str(e)}")
+
+    # ─── VAPI provider (default) ─────────────────────────────────────────
+    api_key = os.getenv("VAPI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="VAPI_API_KEY not configured")
+
+    phone_number_id = os.getenv("PHONE_NUMBER_ID")
+    if not phone_number_id:
+        raise HTTPException(status_code=500, detail="PHONE_NUMBER_ID not configured")
 
     submit_url = os.getenv(
         "SURVEY_SUBMIT_URL",

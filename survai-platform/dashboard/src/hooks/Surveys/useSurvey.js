@@ -79,10 +79,10 @@ export const useSurvey = () => {
     }
   };
 
-  const sendSurveyBySMS = async (surveyId, phone, surveyName) => {
+  const sendSurveyBySMS = async (surveyId, phone, provider = "vapi") => {
     setIsSendingSMS(true);
     try {
-      const result = await SurveyService.sendSurveyBySMS(surveyId, phone, surveyName);
+      const result = await SurveyService.sendSurveyBySMS(surveyId, phone, provider);
       return result;
     } catch (error) {
       console.error('Error sending survey via SMS:', error);

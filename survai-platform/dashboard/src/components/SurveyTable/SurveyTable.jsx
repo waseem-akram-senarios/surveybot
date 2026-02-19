@@ -89,12 +89,12 @@ const DashboardTable = ({ tableData = [], onRowClick }) => {
     }
   };
 
-  const handleSendPhoneConfirm = async (phone) => {
+  const handleSendPhoneConfirm = async (phone, provider = "vapi") => {
     try {
       const result = await sendSurveyBySMS(
         selectedSurvey.SurveyId, 
         phone, 
-        selectedSurvey.Name
+        provider
       );
       
       console.log('SMS send result:', result); // Debug log

@@ -115,11 +115,12 @@ class SurveyService {
     }
   }
 
-  static async sendSurveyBySMS(surveyId, phone) {
+  static async sendSurveyBySMS(surveyId, phone, provider = "vapi") {
     try {
       const queryParams = new URLSearchParams({
         to: phone,
-        survey_id: surveyId
+        survey_id: surveyId,
+        provider: provider,
       });
       
       const response = await ApiBaseHelper.post(`${ApiLinks.SURVEY_SEND_PHONE}?${queryParams.toString()}`);

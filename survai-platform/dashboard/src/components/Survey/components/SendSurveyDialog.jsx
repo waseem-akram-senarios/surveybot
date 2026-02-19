@@ -6,6 +6,8 @@ import {
   DialogContent,
   IconButton,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
   useMediaQuery,
 } from "@mui/material";
@@ -30,6 +32,7 @@ const SendSurveyDialog = ({
   const [phone, setPhone] = useState("");
   const [emailError, setEmailError] = useState("");
   const [phoneError, setPhoneError] = useState("");
+  const [voiceProvider, setVoiceProvider] = useState("vapi");
 
   const surveyLink = `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyId}`;
 
@@ -88,7 +91,7 @@ const SendSurveyDialog = ({
       setPhoneError("Please enter a valid phone number");
       return;
     }
-    onConfirmPhone(phone);
+    onConfirmPhone(phone, voiceProvider);
   };
 
   const handleCopyLink = () => {
@@ -104,6 +107,7 @@ const SendSurveyDialog = ({
       setPhone("");
       setEmailError("");
       setPhoneError("");
+      setVoiceProvider("vapi");
       onClose();
     }
   };
@@ -254,7 +258,7 @@ const SendSurveyDialog = ({
               >
                 Enter Phone Number
               </Typography>
-              <Box sx={{ display: "flex", alignItems: "center" }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
                 <img src={PhoneIcon} alt="Phone-Icon" style={{ marginRight: '7.5px' }} />
                 <TextField
                   fullWidth
@@ -276,6 +280,61 @@ const SendSurveyDialog = ({
                     },
                   }}
                 />
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                <Typography
+                  sx={{
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: 400,
+                    fontSize: "13px",
+                    color: "#666",
+                  }}
+                >
+                  Voice engine:
+                </Typography>
+                <ToggleButtonGroup
+                  value={voiceProvider}
+                  exclusive
+                  onChange={(e, val) => { if (val) setVoiceProvider(val); }}
+                  size="small"
+                  disabled={isLoading}
+                  sx={{ height: 32 }}
+                >
+                  <ToggleButton
+                    value="vapi"
+                    sx={{
+                      textTransform: "none",
+                      fontFamily: "Poppins, sans-serif",
+                      fontSize: "12px",
+                      px: 2,
+                      borderRadius: "8px !important",
+                      "&.Mui-selected": {
+                        backgroundColor: "#1958F7",
+                        color: "#fff",
+                        "&:hover": { backgroundColor: "#1445d4" },
+                      },
+                    }}
+                  >
+                    VAPI
+                  </ToggleButton>
+                  <ToggleButton
+                    value="livekit"
+                    sx={{
+                      textTransform: "none",
+                      fontFamily: "Poppins, sans-serif",
+                      fontSize: "12px",
+                      px: 2,
+                      borderRadius: "8px !important",
+                      "&.Mui-selected": {
+                        backgroundColor: "#1958F7",
+                        color: "#fff",
+                        "&:hover": { backgroundColor: "#1445d4" },
+                      },
+                    }}
+                  >
+                    LiveKit
+                  </ToggleButton>
+                </ToggleButtonGroup>
               </Box>
             </Box>
           )}

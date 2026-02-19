@@ -129,12 +129,12 @@ const SurveyInProgress = () => {
     }
   };
 
-  const handleSendPhoneConfirm = async (phone) => {
+  const handleSendPhoneConfirm = async (phone, provider = "vapi") => {
     try {
       const result = await sendSurveyBySMS(
         selectedSurvey.SurveyId, 
         phone, 
-        selectedSurvey.Name
+        provider
       );
       
       showSuccess(`Survey "${selectedSurvey.Name}" sent successfully to ${phone}`);

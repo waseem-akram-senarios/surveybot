@@ -54,7 +54,6 @@ async def dispatch_livekit_call(
     try:
         dispatch = await lk_api.agent_dispatch.create_dispatch(
             api.CreateAgentDispatchRequest(
-                agent_name="survey-caller",
                 room=room_name,
                 metadata=metadata,
             )

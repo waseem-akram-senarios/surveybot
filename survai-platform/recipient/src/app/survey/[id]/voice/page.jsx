@@ -739,7 +739,7 @@ export default function VoiceSurveyPage() {
           }
           50% {
             transform: scale(1.2);
-            opacity: 0.7);
+            opacity: 0.7;
           }
           100% {
             transform: scale(1);

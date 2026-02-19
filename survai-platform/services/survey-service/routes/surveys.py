@@ -581,6 +581,14 @@ async def create_survey(survey_data: SurveyQuestionsP):
                 insert_params,
             )
 
+        try:
+            sql_execute(
+                "UPDATE surveys SET ai_augmented = :ai_augmented WHERE id = :survey_id",
+                {"ai_augmented": survey_data.AiAugmented, "survey_id": survey_data.SurveyId},
+            )
+        except Exception:
+            pass
+
         return {"message": f"Questions added to SurveyId {survey_data.SurveyId}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

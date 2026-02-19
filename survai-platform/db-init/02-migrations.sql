@@ -109,3 +109,6 @@ CREATE INDEX IF NOT EXISTS idx_survey_analytics_survey ON survey_analytics(surve
 CREATE INDEX IF NOT EXISTS idx_surveys_campaign ON surveys(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_surveys_rider ON surveys(rider_id);
 CREATE INDEX IF NOT EXISTS idx_surveys_channel ON surveys(channel);
+
+-- AI Augmented toggle support
+ALTER TABLE surveys ADD COLUMN IF NOT EXISTS ai_augmented boolean DEFAULT true;

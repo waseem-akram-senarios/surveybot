@@ -100,12 +100,12 @@ class TemplateQuestionDeleteRequestP(BaseModel):
 
 class SurveyBaseP(BaseModel):
     SurveyId: str = Field(default_factory=lambda: str(uuid4()))
-    Biodata: str
+    Biodata: str = ""
     Recipient: str
     Name: str
-    RiderName: str
-    RideId: str
-    TenantId: str
+    RiderName: str = ""
+    RideId: str = ""
+    TenantId: str = ""
 
 
 class SurveyCreateP(SurveyBaseP):
@@ -182,6 +182,7 @@ class SurveyQuestionOrderP(QuestionP):
 class SurveyQuestionsP(BaseModel):
     SurveyId: str
     QuestionswithAns: List[SurveyQuestionOrderP]
+    AiAugmented: bool = True
 
 
 class SurveyStatusP(BaseModel):

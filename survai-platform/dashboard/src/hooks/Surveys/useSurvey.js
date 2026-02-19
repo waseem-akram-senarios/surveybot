@@ -28,10 +28,10 @@ export const useSurvey = () => {
     }
   };
 
-  const launchSurvey = async (surveyData, questions) => {
+  const launchSurvey = async (surveyData, questions, aiAugmented = true) => {
     setIsLaunching(true);
     try {
-      const result = await SurveyService.launchSurvey(surveyData, questions);
+      const result = await SurveyService.launchSurvey(surveyData, questions, aiAugmented);
       return result;
     } finally {
       setIsLaunching(false);

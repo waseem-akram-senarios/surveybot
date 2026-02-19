@@ -239,15 +239,7 @@ export const validateSurveyForm = (selectedTemplate, recipientName, riderName, r
   if (!recipientName.trim()) {
     return { isValid: false, error: "Please enter recipient name" };
   }
-  if (!riderName.trim()) {
-    return { isValid: false, error: "Please enter rider name" };
-  }
-  if (!rideId.trim()) {
-    return { isValid: false, error: "Please enter ride ID" };
-  }
-  if (!tenantId.trim()) {
-    return { isValid: false, error: "Please enter tenant ID" };
-  }
+  // riderName, rideId, and phone are optional -- surveys can be created for internal testing
   return { isValid: true, error: null };
 };
 

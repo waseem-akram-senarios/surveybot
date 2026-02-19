@@ -202,6 +202,19 @@ const SendSurveyDialog = ({
               >
                 Enter Email
               </Typography>
+              <Box
+                sx={{
+                  mb: 2,
+                  p: 1.5,
+                  backgroundColor: "#FFF8E7",
+                  borderRadius: "10px",
+                  border: "1px solid #FFD700",
+                }}
+              >
+                <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "12px", color: "#7A5C00" }}>
+                  <strong>Note:</strong> Email delivery requires a verified sender domain in MailerSend. If no email arrives, check your spam folder or contact your admin to verify the sender domain.
+                </Typography>
+              </Box>
               <Box sx={{ display: "flex", alignItems: "center" }}>
                 <img src={EmailIcon} alt="Email-Icon" style={{ marginRight: '7.5px' }} />
                 <TextField
@@ -210,7 +223,7 @@ const SendSurveyDialog = ({
                   value={email}
                   onChange={handleEmailChange}
                   error={!!emailError}
-                  helperText={emailError}
+                  helperText={emailError || "If no email arrives, check spam or share the link directly"}
                   disabled={isLoading}
                   sx={{
                     "& .MuiOutlinedInput-root": {

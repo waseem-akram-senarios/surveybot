@@ -32,9 +32,10 @@ class SurveyService {
     }
   }
 
-  static async launchSurvey(surveyData, questions) {
+  static async launchSurvey(surveyData, questions, aiAugmented = true) {
     try {
       const apiPayload = transformComponentQuestionsToApiFormat(questions, surveyData.surveyId);
+      apiPayload.AiAugmented = aiAugmented;
       console.log("Launching survey with payload:", apiPayload);
       
       const response = await ApiBaseHelper.post(ApiLinks.SURVEY_CREATE, apiPayload);

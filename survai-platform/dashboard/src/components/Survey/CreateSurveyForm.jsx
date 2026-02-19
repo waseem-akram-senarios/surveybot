@@ -11,7 +11,9 @@ import {
   Select,
   MenuItem,
   FormControl,
+  Divider,
 } from "@mui/material";
+import { UploadFile } from "@mui/icons-material";
 
 import { useAlert } from "../../hooks/useAlert";
 import { useSurvey, useTemplates } from "../../hooks/Surveys/useSurvey";
@@ -124,6 +126,35 @@ const CreateSurveyForm = () => {
               Launch New Survey
             </Typography>
           </Box>
+
+          {/* Import Rider Data shortcut */}
+          <Box
+            sx={{
+              mb: 3,
+              p: 2,
+              backgroundColor: "#F8F9FF",
+              borderRadius: "15px",
+              border: "1px dashed #1958F7",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              cursor: "pointer",
+              "&:hover": { backgroundColor: "#EEF3FF" },
+            }}
+            onClick={() => navigate('/surveys/import')}
+          >
+            <Box>
+              <Typography sx={{ fontFamily: "Poppins, sans-serif", fontWeight: 500, fontSize: "14px", color: "#1958F7" }}>
+                Have rider data to import?
+              </Typography>
+              <Typography sx={{ fontFamily: "Poppins, sans-serif", fontWeight: 400, fontSize: "12px", color: "#7D7D7D" }}>
+                Upload a CSV to auto-fill rider details and bulk-create surveys
+              </Typography>
+            </Box>
+            <UploadFile sx={{ color: "#1958F7", fontSize: 28 }} />
+          </Box>
+
+          <Divider sx={{ mb: 3 }} />
 
           {/* Select Template */}
           <Box sx={{ mb: 4 }}>
@@ -253,14 +284,13 @@ const CreateSurveyForm = () => {
                   mb: 1.5,
                 }}
               >
-                Rider Name
+                Rider Name <span style={{ color: "#7D7D7D", fontSize: "12px" }}>(optional)</span>
               </Typography>
               <TextField
                 fullWidth
-                required
                 value={riderName}
                 onChange={(e) => setRiderName(e.target.value)}
-                placeholder="Enter rider name"
+                placeholder="Enter rider name (optional)"
                 variant="outlined"
                 sx={{
                   "& .MuiOutlinedInput-root": {
@@ -287,7 +317,7 @@ const CreateSurveyForm = () => {
             </Box>
           </Box>
 
-          {/* Ride ID and Tenant ID - Side by side */}
+          {/* Ride ID and Phone Number - Side by side */}
           <Box sx={{ display: "flex", gap: 2, mb: 4 }}>
             <Box sx={{ flex: 1 }}>
               <Typography
@@ -300,14 +330,13 @@ const CreateSurveyForm = () => {
                   mb: 1.5,
                 }}
               >
-                Ride ID
+                Ride ID <span style={{ color: "#7D7D7D", fontSize: "12px" }}>(optional)</span>
               </Typography>
               <TextField
                 fullWidth
-                required
                 value={rideId}
                 onChange={(e) => setRideId(e.target.value)}
-                placeholder="Enter ride id"
+                placeholder="Enter ride ID (optional)"
                 variant="outlined"
                 sx={{
                   "& .MuiOutlinedInput-root": {
@@ -344,14 +373,13 @@ const CreateSurveyForm = () => {
                   mb: 1.5,
                 }}
               >
-                Tenant ID
+                Phone Number <span style={{ color: "#7D7D7D", fontSize: "12px" }}>(optional)</span>
               </Typography>
               <TextField
                 fullWidth
-                required
                 value={tenantId}
                 onChange={(e) => setTenantId(e.target.value)}
-                placeholder="Enter tenant id"
+                placeholder="e.g. +1 555 000 0000 (optional)"
                 variant="outlined"
                 sx={{
                   "& .MuiOutlinedInput-root": {

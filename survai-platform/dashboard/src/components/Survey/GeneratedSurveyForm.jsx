@@ -33,6 +33,7 @@ const GeneratedSurveyForm = () => {
   const [questions, setQuestions] = useState(surveyData.questions || []);
   const [showShareModal, setShowShareModal] = useState(false);
   const [surveyLink, setSurveyLink] = useState("");
+  const [aiAugmented, setAiAugmented] = useState(true);
 
   // Load templates on component mount
   useEffect(() => {
@@ -98,7 +99,7 @@ const GeneratedSurveyForm = () => {
     }
     
     try {
-      const launchResponse = await launchSurvey(surveyData, questions);
+      const launchResponse = await launchSurvey(surveyData, questions, aiAugmented);
             
       if (launchResponse.success) {
         setSurveyLink(launchResponse.surveyLink);
@@ -204,6 +205,8 @@ const GeneratedSurveyForm = () => {
           onBack={handleBack}
           isLaunching={isLaunching}
           isGenerating={isGenerating}
+          aiAugmented={aiAugmented}
+          onAiAugmentedToggle={setAiAugmented}
         />
       </Box>
 

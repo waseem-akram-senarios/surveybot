@@ -1,11 +1,22 @@
 "use client";
-import { Box, Typography, Grid, Button, CircularProgress, Card } from "@mui/material";
+import { Box, Typography, Button, CircularProgress, Card, Avatar, Chip } from "@mui/material";
+import { AutoAwesome, RecordVoiceOver, TextFields } from "@mui/icons-material";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Background from '../../../../public/StartBackground.svg'
 import { detectLanguage, t } from '../../../lib/i18n';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+const GREETING_LINES = [
+  (name, lang) => lang === 'es' ? `¡Hola${name ? `, ${name}` : ''}! 👋` : `Hi${name ? `, ${name}` : ''}! 👋`,
+  (name, lang) => lang === 'es'
+    ? `Soy tu asistente de encuesta de IA. Estoy aquí para recopilar tus comentarios de forma rápida y sencilla.`
+    : `I'm your AI survey assistant. I'm here to collect your feedback quickly and easily.`,
+  (_name, lang) => lang === 'es'
+    ? `Solo toma unos minutos. ¡Tu opinión importa! 🙏`
+    : `It only takes a few minutes. Your opinion matters! 🙏`,
+];
 
 export default function Survey() {
   const router = useRouter();
@@ -14,67 +25,44 @@ export default function Survey() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [recipientName, setRecipientName] = useState("");
+  const [surveyName, setSurveyName] = useState("");
   const [lang, setLang] = useState("en");
+  const [visibleLines, setVisibleLines] = useState(0);
 
   const fetchRecipientInfo = async () => {
     if (!id) return;
-
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/surveys/${id}/recipient`,
-        {
-          method: "GET",
-          headers: {
-            accept: "application/json",
-          },
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      const response = await fetch(`${API_BASE_URL}/api/surveys/${id}/recipient`, {
+        method: "GET",
+        headers: { accept: "application/json" },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const result = await response.json();
-      console.log("Fetching recipient info for survey ID:", result);
-      setRecipientName(result.Recipient);
-      if (result.Name) {
-        setLang(detectLanguage(result.Name));
-      }
+      setRecipientName(result.Recipient || "");
+      setSurveyName(result.Name || "");
+      if (result.Name) setLang(detectLanguage(result.Name));
     } catch (error) {
       console.error("Error fetching recipient info:", error);
-      setError("Failed to load survey");
     }
   };
 
   const checkSurveyStatus = async () => {
     if (!id) return;
-
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/surveys/${id}/status`,
-        {
-          method: "GET",
-          headers: {
-            accept: "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
+      const response = await fetch(`${API_BASE_URL}/api/surveys/${id}/status`, {
+        method: "GET",
+        headers: { accept: "application/json" },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const result = await response.json();
-
       if (result.Status === "Completed") {
         router.push(`/survey/${id}/complete`);
         return;
       }
-
       setIsLoading(false);
     } catch (error) {
       console.error("Error checking survey status:", error);
-      setError("Failed to load survey status");
+      setError("Failed to load survey. The link may be invalid or expired.");
       setIsLoading(false);
     }
   };
@@ -83,37 +71,53 @@ export default function Survey() {
     const initializePage = async () => {
       await Promise.all([fetchRecipientInfo(), checkSurveyStatus()]);
     };
-
     initializePage();
   }, [id, router]);
 
+  // Animate greeting lines appearing one by one
+  useEffect(() => {
+    if (isLoading || error) return;
+    setVisibleLines(0);
+    const timers = GREETING_LINES.map((_, i) =>
+      setTimeout(() => setVisibleLines(v => Math.max(v, i + 1)), i * 900)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [isLoading, error]);
+
   const handleStart = () => {
-    if (id) {
-      router.push(`/survey/${id}/start`);
-    }
+    if (id) router.push(`/survey/${id}/start`);
   };
 
   if (isLoading) {
     return (
-      <Box
-        p={8}
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="50vh"
-      >
-        <CircularProgress />
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh"
+        sx={{ background: "linear-gradient(135deg, #EEF3FF 0%, #F8F9FF 100%)" }}>
+        <Box textAlign="center">
+          <CircularProgress sx={{ color: "#1958F7", mb: 2 }} />
+          <Typography sx={{ fontFamily: "Poppins, sans-serif", color: "#7D7D7D", fontSize: "14px" }}>
+            Loading your survey…
+          </Typography>
+        </Box>
       </Box>
     );
   }
 
   if (error) {
     return (
-      <Box p={8} textAlign="center">
-        <Typography color="error" mb={2}>
-          {error}
-        </Typography>
-        <Button onClick={() => window.location.reload()}>Retry</Button>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh"
+        sx={{ background: "linear-gradient(135deg, #EEF3FF 0%, #F8F9FF 100%)" }}>
+        <Card sx={{ maxWidth: 420, p: 4, borderRadius: "24px", textAlign: "center" }}>
+          <Typography sx={{ fontFamily: "Poppins, sans-serif", fontWeight: 600, fontSize: "20px", mb: 1 }}>
+            Survey Not Found
+          </Typography>
+          <Typography color="text.secondary" sx={{ fontFamily: "Poppins, sans-serif", fontSize: "14px", mb: 3 }}>
+            {error}
+          </Typography>
+          <Button onClick={() => window.location.reload()} variant="outlined"
+            sx={{ borderRadius: "12px", textTransform: "none", fontFamily: "Poppins, sans-serif" }}>
+            Retry
+          </Button>
+        </Card>
       </Box>
     );
   }
@@ -126,106 +130,184 @@ export default function Survey() {
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
-        backdropFilter: "blur(20.299999237060547px)",
         display: "flex",
         flexDirection: "column",
-        padding: "20px",
-        position: "relative",
-        overflow: "hidden",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px",
       }}
     >
-      {/* Header */}
-      <Box textAlign="center" pt={4}>
-        <Typography
-          sx={{
-            fontFamily: "Saira, sans-serif",
-            fontSize: "48px",
-            fontWeight: "400",
-            color: "#000"
-          }}
-        >
+      {/* Branding */}
+      <Box textAlign="center" mb={4}>
+        <Typography sx={{ fontFamily: "Saira, sans-serif", fontSize: "40px", fontWeight: 400, color: "#000" }}>
           SurvAI
         </Typography>
-        <Typography
+        <Chip
+          icon={<AutoAwesome sx={{ fontSize: 14 }} />}
+          label="AI-Powered Survey"
+          size="small"
           sx={{
             fontFamily: "Poppins, sans-serif",
-            fontSize: "16px",
-            fontWeight: "400",
-            lineHeight: "24px",
-            color: "#929292",
+            fontSize: "11px",
+            backgroundColor: "#EEF3FF",
+            color: "#1958F7",
+            border: "1px solid #C5D5FF",
+            mt: 0.5,
           }}
-        >
-          {t('customerSurvey', lang)}
-        </Typography>
+        />
       </Box>
 
-      {/* Main Card - Centered */}
-      <Box
+      {/* Main Greeting Card */}
+      <Card
         sx={{
-          flex: 1,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
+          maxWidth: "520px",
+          width: "100%",
+          p: { xs: 3, md: 5 },
+          borderRadius: "28px",
+          background: "rgba(255, 255, 255, 0.85)",
+          border: "1px solid #EAEAEA",
+          backdropFilter: "blur(40px)",
+          boxShadow: "0 8px 40px rgba(25, 88, 247, 0.08)",
         }}
       >
-        <Card
-          sx={{
-            maxWidth: "500px",
-            width: "100%",
-            p: 6,
-            borderRadius: "24px",
-            textAlign: "center",
-            background: "rgba(255, 255, 255, 0.2)",
-            border: "1px solid #EAEAEA",
-            backdropFilter:' blur(40.099998474121094px)'
-          }}
-        >
-          <Typography
+        {/* AI Avatar */}
+        <Box display="flex" alignItems="center" gap={2} mb={3}>
+          <Avatar
             sx={{
-              fontFamily: "Segoe UI, sans-serif",
-              fontSize: "32px",
-              fontWeight: "700",
-              color: "#333",
+              width: 48,
+              height: 48,
+              background: "linear-gradient(135deg, #1958F7 0%, #6B8FF7 100%)",
+              boxShadow: "0 4px 12px rgba(25, 88, 247, 0.3)",
+            }}
+          >
+            <AutoAwesome sx={{ fontSize: 22, color: "#fff" }} />
+          </Avatar>
+          <Box>
+            <Typography sx={{ fontFamily: "Poppins, sans-serif", fontWeight: 600, fontSize: "14px", color: "#1E1E1E" }}>
+              SurvAI Assistant
+            </Typography>
+            <Box display="flex" alignItems="center" gap={0.5}>
+              <Box sx={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "#00C853", animation: "pulse 1.5s infinite" }} />
+              <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "11px", color: "#7D7D7D" }}>
+                Online
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Animated greeting lines (chat bubble style) */}
+        {GREETING_LINES.map((getLine, i) => (
+          visibleLines > i && (
+            <Box
+              key={i}
+              sx={{
+                mb: 2,
+                p: "12px 16px",
+                backgroundColor: i === 0 ? "#EEF3FF" : "#F8F9FA",
+                borderRadius: i === 0 ? "4px 18px 18px 18px" : "4px 18px 18px 18px",
+                border: i === 0 ? "1px solid #C5D5FF" : "1px solid #F0F0F0",
+                animation: "fadeSlideIn 0.4s ease",
+                "@keyframes fadeSlideIn": {
+                  from: { opacity: 0, transform: "translateY(8px)" },
+                  to: { opacity: 1, transform: "translateY(0)" },
+                },
+              }}
+            >
+              <Typography
+                sx={{
+                  fontFamily: "Poppins, sans-serif",
+                  fontSize: i === 0 ? "20px" : "14px",
+                  fontWeight: i === 0 ? 600 : 400,
+                  color: i === 0 ? "#1958F7" : "#333",
+                  lineHeight: 1.5,
+                }}
+              >
+                {getLine(recipientName, lang)}
+              </Typography>
+            </Box>
+          )
+        ))}
+
+        {/* Survey name badge */}
+        {visibleLines >= GREETING_LINES.length && surveyName && (
+          <Box
+            sx={{
               mb: 3,
+              p: "10px 14px",
+              backgroundColor: "#FFF8E7",
+              borderRadius: "12px",
+              border: "1px solid #FFD700",
+              animation: "fadeSlideIn 0.4s ease",
+              "@keyframes fadeSlideIn": {
+                from: { opacity: 0, transform: "translateY(8px)" },
+                to: { opacity: 1, transform: "translateY(0)" },
+              },
             }}
           >
-            {t('hello', lang)}, {recipientName} 👋
-          </Typography>
-          
-          <Typography
-            sx={{
-              fontFamily: "Poppins, sans-serif",
-              fontSize: "16px",
-              fontWeight: "400",
-              color: "#1A2D6B",
-              lineHeight: "24px",
-              mb: 4,
-            }}
-          >
-            {t('welcome', lang)} {t('customerSurvey', lang)}.
-          </Typography>
-          
-          <Button
-            variant="contained"
-            size="large"
-            onClick={handleStart}
-            sx={{
-              backgroundColor: "#1958F7",
-              "&:hover": { backgroundColor: "#3367d6" },
-              borderRadius: "17px",
-              width: "150px",
-              height: "48px",
-              fontFamily: "Poppins, sans-serif",
-              fontWeight: "500",
-              fontSize: "16px",
-              textTransform: "none",
-              boxShadow: "0 4px 12px rgba(66, 133, 244, 0.3)",
-            }}
-          >
-            {lang === 'es' ? 'Iniciar Encuesta' : 'Start Survey'}
-          </Button>
-        </Card>
-      </Box>
+            <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "12px", color: "#7A5C00", mb: 0.3 }}>
+              Today's survey
+            </Typography>
+            <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "14px", fontWeight: 600, color: "#1E1E1E" }}>
+              {surveyName}
+            </Typography>
+          </Box>
+        )}
+
+        {/* Mode selection */}
+        {visibleLines >= GREETING_LINES.length && (
+          <Box sx={{ display: "flex", gap: 1.5, mb: 3, animation: "fadeSlideIn 0.4s ease" }}>
+            <Button
+              variant="contained"
+              startIcon={<TextFields />}
+              onClick={() => router.push(`/survey/${id}/text`)}
+              sx={{
+                flex: 1,
+                textTransform: "none",
+                borderRadius: "14px",
+                height: "48px",
+                backgroundColor: "#1958F7",
+                fontFamily: "Poppins, sans-serif",
+                fontSize: "13px",
+                fontWeight: 500,
+                boxShadow: "0 4px 12px rgba(25, 88, 247, 0.25)",
+                "&:hover": { backgroundColor: "#1443D1" },
+              }}
+            >
+              {lang === 'es' ? 'Texto' : 'Text Survey'}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<RecordVoiceOver />}
+              onClick={handleStart}
+              sx={{
+                flex: 1,
+                textTransform: "none",
+                borderRadius: "14px",
+                height: "48px",
+                borderColor: "#1958F7",
+                color: "#1958F7",
+                fontFamily: "Poppins, sans-serif",
+                fontSize: "13px",
+                fontWeight: 500,
+                "&:hover": { backgroundColor: "#EEF3FF", borderColor: "#1443D1" },
+              }}
+            >
+              {lang === 'es' ? 'Voz' : 'Voice Survey'}
+            </Button>
+          </Box>
+        )}
+
+        <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "11px", color: "#AAA", textAlign: "center" }}>
+          {lang === 'es' ? 'Tus respuestas son confidenciales' : 'Your responses are confidential and anonymous'}
+        </Typography>
+      </Card>
+
+      <style jsx global>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
     </Box>
   );
 }

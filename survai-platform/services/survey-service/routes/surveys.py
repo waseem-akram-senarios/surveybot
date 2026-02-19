@@ -708,26 +708,39 @@ async def makecall(request: MakeCallRequest):
 @router.post("/surveys/sendemail")
 async def sendemail(email: Email):
     """Send email survey."""
+    api_key = os.getenv("MAILERSEND_API_KEY")
+    sender_email = os.getenv("MAILERSEND_SENDER_EMAIL", "noreply@example.com")
+
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Email service not configured: MAILERSEND_API_KEY is missing. Contact your administrator.",
+        )
+
     try:
-        ms = MailerSendClient(api_key=os.getenv("MAILERSEND_API_KEY"))
+        ms = MailerSendClient(api_key=api_key)
         url = email.SurveyURL
         html_body = build_html_email(url)
         text_body = build_text_email(url)
 
         msg = (
             EmailBuilder()
-            .from_email(os.getenv("MAILERSEND_SENDER_EMAIL", "noreply@example.com"), "Survey")
+            .from_email(sender_email, "SurvAI")
             .to_many([{"email": email.EmailTo, "name": "Recipient"}])
-            .subject("Survey for ITCurves!")
+            .subject("Your Survey is Ready!")
             .html(html_body)
             .text(text_body)
             .build()
         )
         ms.emails.send(msg)
-        return "Email sent successfully"
+        logger.info(f"Survey email sent to {email.EmailTo} (survey: {url})")
+        return {"message": "Email sent successfully"}
     except Exception as e:
-        logger.exception(e)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(f"Failed to send survey email to {email.EmailTo}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send email: {str(e)}. Check that your MailerSend sender domain is verified.",
+        )
 
 
 @router.post("/surveys/callback")

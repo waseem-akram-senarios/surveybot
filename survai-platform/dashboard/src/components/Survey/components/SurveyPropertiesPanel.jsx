@@ -7,7 +7,10 @@ import {
   Select,
   MenuItem,
   FormControl,
+  Switch,
+  Tooltip,
 } from "@mui/material";
+import { InfoOutlined } from "@mui/icons-material";
 import Save from "../../../assets/Save.svg";
 
 const SurveyPropertiesPanel = ({
@@ -24,6 +27,8 @@ const SurveyPropertiesPanel = ({
   onBack,
   isLaunching,
   isGenerating,
+  aiAugmented,
+  onAiAugmentedToggle,
 }) => {
   const isMobile = useMediaQuery("(max-width: 600px)");
 
@@ -230,6 +235,60 @@ const SurveyPropertiesPanel = ({
             },
           }}
         />
+      </Box>
+
+      {/* AI Augmented Toggle */}
+      <Box
+        sx={{
+          mb: 3,
+          p: 2,
+          backgroundColor: aiAugmented ? "#EEF3FF" : "#F8F9FA",
+          borderRadius: "15px",
+          border: `1px solid ${aiAugmented ? "#1958F7" : "#F0F0F0"}`,
+          transition: "all 0.2s ease",
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <Typography
+              sx={{
+                fontFamily: "Poppins, sans-serif",
+                fontWeight: 500,
+                fontSize: "14px",
+                color: aiAugmented ? "#1958F7" : "#1E1E1E",
+              }}
+            >
+              AI Augmented
+            </Typography>
+            <Tooltip
+              title="When enabled, the AI agent will analyze each question and answer during the call. It can intelligently skip questions that are already answered by previous responses or irrelevant to this rider."
+              placement="top"
+            >
+              <InfoOutlined sx={{ fontSize: 16, color: "#7D7D7D", cursor: "pointer" }} />
+            </Tooltip>
+          </Box>
+          <Switch
+            checked={!!aiAugmented}
+            onChange={(e) => onAiAugmentedToggle && onAiAugmentedToggle(e.target.checked)}
+            sx={{
+              "& .MuiSwitch-switchBase.Mui-checked": { color: "#1958F7" },
+              "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#1958F7" },
+            }}
+          />
+        </Box>
+        <Typography
+          sx={{
+            fontFamily: "Poppins, sans-serif",
+            fontWeight: 400,
+            fontSize: "12px",
+            color: "#7D7D7D",
+            mt: 0.5,
+          }}
+        >
+          {aiAugmented
+            ? "AI will analyze Q&A and skip irrelevant questions automatically"
+            : "All questions will be asked in order — no AI skipping"}
+        </Typography>
       </Box>
 
       {/* Launch Survey Button */}

@@ -13,7 +13,7 @@ import logging
 import re
 from typing import Any, Dict, List, Optional
 
-from prompts import DEFAULT_GLOBAL_PROMPT_EN, DEFAULT_GLOBAL_PROMPT_ES
+from prompts import DEFAULT_GLOBAL_PROMPT_EN, DEFAULT_GLOBAL_PROMPT_ES, MAX_SURVEY_QUESTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,26 @@ def build_workflow_config(
     Returns a dict ready to POST to VAPI's /workflow endpoint.
     """
     questions = sorted(questions, key=lambda q: q.get("order", 0))
+
+    # Enforce max question limit using AI prioritization
+    if len(questions) > MAX_SURVEY_QUESTIONS:
+        logger.info(
+            f"Survey {survey_id}: {len(questions)} questions exceeds max {MAX_SURVEY_QUESTIONS}, "
+            "using AI to prioritize"
+        )
+        try:
+            from llm import prioritize_questions as _prioritize
+            rider_ctx = ""
+            if rider_data:
+                rider_ctx = " ".join(f"{k}: {v}" for k, v in rider_data.items() if v)
+            selected_ids = _prioritize(questions, MAX_SURVEY_QUESTIONS, rider_ctx)
+            selected_set = set(selected_ids)
+            questions = [q for q in questions if q["id"] in selected_set]
+            questions = sorted(questions, key=lambda q: q.get("order", 0))
+            logger.info(f"Survey {survey_id}: Prioritized to {len(questions)} questions")
+        except Exception as e:
+            logger.warning(f"AI prioritization failed, using first {MAX_SURVEY_QUESTIONS}: {e}")
+            questions = questions[:MAX_SURVEY_QUESTIONS]
 
     for question in questions:
         if question.get("criteria") == "categorical" and question.get("categories"):
@@ -416,79 +436,73 @@ def _create_question_node(question, index, language="en", voice_cfg=None, rider_
 
 def _create_categorical_prompt(question_text, categories, language="en", rider_context=""):
     categories_str = ", ".join(categories or [])
+    context_hint = f"\nRider context: {rider_context}" if rider_context else ""
+
     if language == "es":
         return (
-            f"Haz esta pregunta con estas palabras exactas: '{question_text}' "
-            "No menciones las opciones especificas al usuario a menos que pregunte. "
-            f"En su lugar, escucha su respuesta y determina que categoria se ajusta mejor: "
-            f"Categorias disponibles: {categories_str}. "
-            "Si su respuesta no encaja claramente en ninguna categoria, haz preguntas de seguimiento para aclarar. "
-            "Se conversacional y util para guiarlos a proporcionar una respuesta clara. "
-            "Si quieren terminar la llamada, no les hagas mas preguntas."
+            f"Haz esta pregunta de forma conversacional: '{question_text}'\n"
+            "No menciones las opciones a menos que pregunten.\n"
+            f"Categorias: {categories_str}\n"
+            "INTELIGENCIA: Si ya respondieron esto en una respuesta anterior, confirma en vez de re-preguntar.\n"
+            "Si quieren terminar la llamada, no insistas."
+            f"{context_hint}"
         )
     return (
-        f"Ask this question in these exact words: '{question_text}' "
-        "Don't mention the specific options to the user unless they ask. "
-        f"Instead, listen to their response and determine which category it best fits: "
-        f"Available categories: {categories_str}. "
-        "If their answer doesn't clearly fit any category, ask follow-up questions to clarify. "
-        "Be conversational and helpful in guiding them to provide a clear answer. "
-        "If they want to end the call or not proceed with the survey any further for any reason, do not question them further. "
-        "If the user asks for more information, use specific, relevant parts of the following facts to address his queries. "
-        "1) This survey is being conducted on behalf of the organization. "
-        "2) This is for the Ride with ID {{RideID}}. "
-        "3) The goal of the survey is to improve the products and services based on user feedback."
+        f"Ask this question conversationally: '{question_text}'\n"
+        f"Don't list options unless they ask. Listen and map to: {categories_str}\n"
+        "INTELLIGENCE:\n"
+        "- If they already answered this in a previous response, confirm rather than re-ask\n"
+        "- If their answer is ambiguous, ask ONE clarifying question\n"
+        "- If they want to end the call, respect that immediately\n"
+        "- If they ask what this is about: this survey improves products and services based on feedback"
+        f"{context_hint}"
     )
 
 
 def _create_rating_prompt(question_text, scales, language="en", rider_context=""):
+    context_hint = f"\nRider context: {rider_context}" if rider_context else ""
+
     if language == "es":
         return (
-            f"Haz esta pregunta con estas palabras exactas: '{question_text}' "
-            f"Esta es una pregunta de calificacion con escala de 1 a {scales}. No pidas un numero especifico inicialmente. "
-            "En su lugar, haz la pregunta conversacionalmente y escucha: "
-            "- Palabras descriptivas (excelente, bueno, malo, terrible, etc.) "
-            "- Niveles de satisfaccion (muy satisfecho, algo satisfecho, etc.) "
-            f"Basandote en su respuesta, infiere la calificacion apropiada en la escala de 1 a {scales}. "
-            "Solo pide un numero especifico si no puedes determinar la calificacion de su respuesta conversacional."
+            f"Pregunta conversacionalmente: '{question_text}'\n"
+            f"Escala de 1 a {scales}. No pidas un numero directamente.\n"
+            "Escucha palabras descriptivas y luego infiere la calificacion.\n"
+            "INTELIGENCIA: Si ya expresaron satisfaccion/insatisfaccion clara, confirma el numero.\n"
+            "Solo pide numero si no puedes determinar de su respuesta."
+            f"{context_hint}"
         )
     return (
-        f"Ask this question in these exact words: '{question_text}' "
-        f"This is a rating question with a scale of 1 to {scales}. Don't ask for a specific number initially. "
-        "Instead, ask the question conversationally and listen for: "
-        "- Descriptive words (excellent, good, poor, terrible, etc.) "
-        "- Satisfaction levels (very satisfied, somewhat satisfied, etc.) "
-        "- Quality indicators (high quality, low quality, etc.) "
-        f"Based on their response, infer the appropriate rating on the 1-{scales} scale. "
-        "Only ask for a specific number if you can't determine the rating from their conversational response. "
-        "If they want to end the call or not proceed with the survey any further for any reason, do not question them further. "
-        "If the user asks for more information, use specific, relevant parts of the following facts to address his queries. "
-        "1) This survey is being conducted on behalf of the organization. "
-        "2) This is for the Ride with ID {{RideID}}. "
-        "3) The goal of the survey is to improve the products and services based on user feedback."
+        f"Ask conversationally: '{question_text}'\n"
+        f"Rating scale: 1-{scales}. Don't ask for a number upfront.\n"
+        "Listen for descriptive words (excellent, terrible, okay) and infer the rating.\n"
+        "INTELLIGENCE:\n"
+        "- If prior answers already suggest a rating for this topic, confirm: 'Sounds like maybe a [X]?'\n"
+        "- Only ask for a specific number if you can't infer from conversation\n"
+        "- Accept descriptive answers and map them: great=4-5, okay=3, bad=1-2"
+        f"{context_hint}"
     )
 
 
 def _create_open_prompt(question_text, language="en", rider_context=""):
+    context_hint = f"\nRider context: {rider_context}" if rider_context else ""
+
     if language == "es":
         return (
-            f"Haz esta pregunta con estas palabras exactas: '{question_text}' "
-            "Esta es una pregunta abierta. Deja que el usuario responda libremente y captura su respuesta completa. "
-            "Si dan una respuesta muy breve, puedes hacer una pregunta de seguimiento como "
-            "'Podria contarme un poco mas sobre eso?' para obtener comentarios mas detallados. "
-            "Puedes hacer hasta 1-2 preguntas de seguimiento breves si su respuesta es muy corta (menos de 5 palabras)."
+            f"Pregunta: '{question_text}'\n"
+            "Pregunta abierta. Deja que respondan libremente.\n"
+            "Si la respuesta es muy breve (<5 palabras), haz UNA pregunta de seguimiento.\n"
+            "Maximo 1 seguimiento. Si no quieren elaborar, avanza."
+            f"{context_hint}"
         )
     return (
-        f"Ask this question in these exact words: '{question_text}' "
-        "This is an open-ended question. Let the user respond freely and capture their complete response. "
-        "If they give a very brief answer (under 5 words), you may ask 1-2 brief clarifying follow-up questions like "
-        "'Could you tell me a bit more about that?' or 'What specifically made you feel that way?' to get more detailed feedback. "
-        "But never ask more than 2 follow-ups per question. "
-        "If they want to end the call or not proceed with the survey any further for any reason, do not question them further. "
-        "If the user asks for more information, use specific, relevant parts of the following facts to address his queries. "
-        "1) This survey is being conducted on behalf of the organization. "
-        "2) This is for the Ride with ID {{RideID}}. "
-        "3) The goal of the survey is to improve the products and services based on user feedback."
+        f"Ask: '{question_text}'\n"
+        "Open-ended question. Let them talk freely and capture everything.\n"
+        "INTELLIGENCE:\n"
+        "- If answer is vague (<5 words), ask ONE targeted follow-up\n"
+        "- If they already covered this topic earlier, acknowledge it and ask what's new\n"
+        "- Max 1 follow-up per question. If they don't want to elaborate, move on.\n"
+        "- Listen for emotions, specific incidents, and suggestions -- that's the gold"
+        f"{context_hint}"
     )
 
 

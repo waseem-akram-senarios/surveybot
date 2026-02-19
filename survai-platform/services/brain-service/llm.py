@@ -16,7 +16,9 @@ from prompts import (
     AUTOFILL_OPEN_PROMPT,
     AUTOFILL_PROMPT,
     FILTERING_PROMPT,
+    MAX_SURVEY_QUESTIONS,
     PARSE_PROMPT,
+    PRIORITIZE_QUESTIONS_PROMPT,
     SUMMARIZE_PROMPT,
     SYMPATHIZE_PROMPT,
     TRANSLATE_CATEGORIES_PROMPT_TEMPLATE,
@@ -187,10 +189,11 @@ def sympathize(question: str, response: str) -> str:
                 {"role": "system", "content": SYMPATHIZE_PROMPT},
                 {
                     "role": "user",
-                    "content": f"Question: {question}\nResponse: {response}",
+                    "content": f"Question: {question}\nUser said: {response}",
                 },
             ],
-            temperature=0.7,
+            temperature=0.8,
+            max_tokens=60,
         )
         return resp.choices[0].message.content.strip()
     except Exception as e:
@@ -291,3 +294,74 @@ def analyze_survey(combined_text: str) -> Dict[str, Any]:
 def filter_question(biodata: str, question: str) -> str:
     """Determine if a question is relevant given user biodata. Returns 'Yes' or 'No'."""
     return "Yes"
+
+
+# ─── Question Prioritization ─────────────────────────────────────────────────
+
+def prioritize_questions(
+    questions: List[Dict],
+    max_count: int = MAX_SURVEY_QUESTIONS,
+    rider_context: str = "",
+) -> List[str]:
+    """
+    Use AI to select and prioritize the most important questions when
+    the survey exceeds the max question limit.
+    Returns ordered list of question IDs to keep.
+    """
+    if len(questions) <= max_count:
+        return [q["id"] for q in questions]
+
+    client = _get_client()
+
+    questions_desc = []
+    for q in questions:
+        desc = f"ID: {q['id']} | Type: {q.get('criteria', 'open')} | Text: {q['text']}"
+        if q.get("parent_id"):
+            desc += f" | CONDITIONAL on: {q['parent_id']}"
+        if q.get("categories"):
+            desc += f" | Options: {', '.join(q['categories'])}"
+        questions_desc.append(desc)
+
+    user_msg = (
+        f"Select the {max_count} most important questions from this list.\n"
+        f"Keep conditional questions with their parent when possible.\n\n"
+        f"QUESTIONS:\n" + "\n".join(questions_desc)
+    )
+    if rider_context:
+        user_msg += f"\n\nRIDER CONTEXT (use to determine relevance):\n{rider_context}"
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": PRIORITIZE_QUESTIONS_PROMPT},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0,
+        )
+        content = resp.choices[0].message.content.strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        selected_ids = json.loads(content)
+
+        valid_ids = {q["id"] for q in questions}
+        selected_ids = [qid for qid in selected_ids if qid in valid_ids]
+
+        # Ensure conditional questions have their parents included
+        id_to_q = {q["id"]: q for q in questions}
+        final_ids = []
+        for qid in selected_ids:
+            q = id_to_q[qid]
+            parent = q.get("parent_id")
+            if parent and parent not in final_ids and parent in valid_ids:
+                final_ids.append(parent)
+            if qid not in final_ids:
+                final_ids.append(qid)
+
+        return final_ids[:max_count]
+
+    except Exception as e:
+        logger.error(f"prioritize_questions error: {e}")
+        return [q["id"] for q in questions[:max_count]]

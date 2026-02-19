@@ -15,6 +15,7 @@ import llm
 from workflow_builder import build_workflow_config
 from prompts import (
     AGENT_SYSTEM_PROMPT_TEMPLATE,
+    MAX_SURVEY_QUESTIONS,
     QUESTION_FORMAT_BRANCH,
     QUESTION_FORMAT_CATEGORICAL,
     QUESTION_FORMAT_OPEN,
@@ -91,6 +92,11 @@ class WorkflowConfigRequest(BaseModel):
     template_config: Optional[Dict[str, Any]] = None
     rider_data: Optional[Dict[str, Any]] = None
     language: str = "en"
+
+class PrioritizeRequest(BaseModel):
+    questions: List[Dict[str, Any]]
+    max_count: int = MAX_SURVEY_QUESTIONS
+    rider_context: str = ""
 
 class SystemPromptRequest(BaseModel):
     survey_name: str
@@ -204,6 +210,19 @@ async def build_workflow_config_endpoint(req: WorkflowConfigRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/prioritize-questions")
+async def prioritize_questions_endpoint(req: PrioritizeRequest):
+    """Select and prioritize the most important questions using AI."""
+    try:
+        selected_ids = llm.prioritize_questions(
+            req.questions, req.max_count, req.rider_context
+        )
+        return {"selected_ids": selected_ids, "count": len(selected_ids)}
+    except Exception as e:
+        logger.error(f"Prioritize error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/build-system-prompt")
 async def build_system_prompt_endpoint(req: SystemPromptRequest):
     """Build the single-node agent system prompt."""
@@ -234,9 +253,20 @@ async def build_system_prompt_endpoint(req: SystemPromptRequest):
             rider_name = "there"
             rider_greeting = ""
 
+        # Enforce max questions limit
+        questions = req.questions
+        if len(questions) > MAX_SURVEY_QUESTIONS:
+            try:
+                rider_ctx = rider_context if rider_data else ""
+                selected_ids = llm.prioritize_questions(questions, MAX_SURVEY_QUESTIONS, rider_ctx)
+                selected_set = set(selected_ids)
+                questions = [q for q in questions if q["id"] in selected_set]
+            except Exception:
+                questions = questions[:MAX_SURVEY_QUESTIONS]
+
         questions_lines = []
-        order_map = {q["id"]: q.get("order", 0) for q in req.questions}
-        for q in req.questions:
+        order_map = {q["id"]: q.get("order", 0) for q in questions}
+        for q in questions:
             order = q.get("order", 0)
             qid = q["id"]
             text = q["text"]
@@ -285,6 +315,7 @@ async def build_system_prompt_endpoint(req: SystemPromptRequest):
             absolute_max_minutes=req.time_limit_minutes,
             rider_name=rider_name,
             rider_greeting=rider_greeting,
+            max_questions=MAX_SURVEY_QUESTIONS,
         )
         return {"system_prompt": prompt}
     except Exception as e:

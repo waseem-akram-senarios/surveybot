@@ -3,7 +3,7 @@ LiveKit Survey Agent
 
 A voice AI agent that conducts phone surveys using LiveKit's Agents Framework.
 All intelligence (system prompt, answer parsing, empathy) comes from brain-service.
-Uses STT (Deepgram) -> LLM (OpenAI) -> TTS (ElevenLabs/OpenAI) pipeline.
+Uses OpenAI Realtime Model for integrated STT + LLM + TTS.
 """
 
 from __future__ import annotations
@@ -13,23 +13,21 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Any
 
 import requests
 from dotenv import load_dotenv
-from livekit import api, rtc
+from livekit import api
 from livekit.agents import (
-    Agent,
-    AgentSession,
+    AutoSubscribe,
     JobContext,
     RunContext,
     WorkerOptions,
     cli,
     function_tool,
     get_job_context,
-    RoomInputOptions,
 )
-from livekit.plugins import deepgram, openai, silero
+from livekit.agents.voice import AgentSession, Agent
+from livekit.plugins import openai, silero
 
 load_dotenv(dotenv_path=".env.local")
 logger = logging.getLogger("livekit-survey-agent")
@@ -44,7 +42,6 @@ ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME", "IT Curves")
 # ─── Backend API helpers ─────────────────────────────────────────────────────
 
 def fetch_survey_data(survey_id: str) -> dict | None:
-    """Fetch survey questions from the backend API."""
     try:
         resp = requests.get(f"{BACKEND_URL}/api/surveys/{survey_id}/questions")
         if resp.status_code == 200:
@@ -57,7 +54,6 @@ def fetch_survey_data(survey_id: str) -> dict | None:
 
 
 def fetch_survey_recipient(survey_id: str) -> dict | None:
-    """Fetch recipient info from the backend."""
     try:
         resp = requests.get(f"{BACKEND_URL}/api/surveys/{survey_id}/recipient_info")
         if resp.status_code == 200:
@@ -70,7 +66,6 @@ def fetch_survey_recipient(survey_id: str) -> dict | None:
 
 
 def submit_survey_answers(survey_id: str, answers: dict) -> bool:
-    """Submit collected answers back to the backend."""
     try:
         payload = {"SurveyId": survey_id, **answers}
         resp = requests.post(
@@ -93,7 +88,6 @@ def fetch_system_prompt(
     company_name: str = "IT Curves",
     time_limit_minutes: int = 8,
 ) -> str | None:
-    """Call brain-service to build the full system prompt."""
     try:
         resp = requests.post(
             f"{BRAIN_SERVICE_URL}/api/brain/build-system-prompt",
@@ -123,7 +117,6 @@ def parse_answer_via_brain(
     options: list[str],
     criteria: str = "categorical",
 ) -> str | None:
-    """Call brain-service to parse natural language into a structured answer."""
     try:
         resp = requests.post(
             f"{BRAIN_SERVICE_URL}/api/brain/parse",
@@ -142,7 +135,7 @@ def parse_answer_via_brain(
         return None
 
 
-# ─── Survey Agent ────────────────────────────────────────────────────────────
+# ─── Survey Agent (phone call mode) ─────────────────────────────────────────
 
 class SurveyAgent(Agent):
     """Voice AI agent powered by brain-service intelligence."""
@@ -168,8 +161,13 @@ class SurveyAgent(Agent):
 
         super().__init__(instructions=system_prompt)
 
+    async def on_enter(self):
+        """Called when agent enters - speak first with a greeting."""
+        await self.session.generate_reply(
+            instructions=f"Immediately greet the participant. You are calling {self.recipient_name}. Start the conversation now."
+        )
+
     async def hangup(self):
-        """Hang up the call by deleting the room."""
         job_ctx = get_job_context()
         await job_ctx.api.room.delete_room(
             api.DeleteRoomRequest(room=job_ctx.room.name)
@@ -262,11 +260,6 @@ class SurveyAgent(Agent):
         except Exception:
             pass
 
-        current_speech = ctx.session.current_speech
-        if current_speech:
-            await current_speech.wait_for_playout()
-
-        await self.hangup()
         return "Survey submitted and call ended."
 
     @function_tool()
@@ -284,11 +277,6 @@ class SurveyAgent(Agent):
             except Exception:
                 pass
 
-        current_speech = ctx.session.current_speech
-        if current_speech:
-            await current_speech.wait_for_playout()
-
-        await self.hangup()
         return "Call ended."
 
     @function_tool()
@@ -299,26 +287,14 @@ class SurveyAgent(Agent):
         return "Voicemail detected, call ended."
 
 
-# ─── TTS selection ───────────────────────────────────────────────────────────
-
-def _build_tts():
-    """Select TTS provider: ElevenLabs if key available, else OpenAI."""
-    eleven_key = os.getenv("ELEVEN_API_KEY", "")
-    if eleven_key:
-        try:
-            from livekit.plugins import elevenlabs
-            voice_id = os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9")
-            return elevenlabs.TTS(voice_id=voice_id, model="eleven_flash_v2_5")
-        except ImportError:
-            logger.warning("ElevenLabs plugin not installed, falling back to OpenAI TTS")
-    return openai.TTS(model="tts-1", voice="nova")
-
-
 # ─── Sandbox demo mode ───────────────────────────────────────────────────────
 
 SANDBOX_PROMPT = f"""You are Cameron, a warm and friendly AI survey assistant from {ORGANIZATION_NAME}.
 
-You're speaking with someone who connected via the web browser. Since this is a live demo, introduce yourself and explain that you're a voice AI agent that conducts conversational surveys over the phone.
+# CRITICAL: YOU MUST SPEAK FIRST!
+When the call connects, immediately start with the greeting below. Do NOT wait for the participant to speak first.
+
+Immediately say: "Hi there! I'm Cameron from {ORGANIZATION_NAME}. I'm a voice AI agent that conducts conversational surveys over the phone. Would you like to try a quick demo conversation?"
 
 If they want to try a demo conversation, have a natural friendly chat. Ask them a few example questions like:
 - How their day is going
@@ -326,20 +302,36 @@ If they want to try a demo conversation, have a natural friendly chat. Ask them 
 - Rate their experience talking to you on a scale of 1 to 5
 
 Be conversational, empathetic, and natural. Don't sound robotic. Keep it brief and fun.
-End by saying they can use this technology to conduct real surveys by connecting it to their survey platform."""
+End by saying they can use this technology to conduct real surveys by connecting it to their survey platform.
+
+Current time: {datetime.now().strftime('%I:%M %p')}
+"""
+
+
+class SandboxAgent(Agent):
+    """Simple agent for sandbox/browser demo."""
+
+    async def on_enter(self):
+        await self.session.generate_reply(
+            instructions=f"Immediately greet the user: 'Hi there! I'm Cameron from {ORGANIZATION_NAME}. I'm a voice AI agent that conducts conversational surveys. Would you like to try a quick demo?'"
+        )
 
 
 async def _run_sandbox_mode(ctx: JobContext):
     """Handle sandbox/browser connections without survey data."""
     logger.info(f"Sandbox mode: room={ctx.room.name}")
 
-    agent = Agent(instructions=SANDBOX_PROMPT)
+    participant = await ctx.wait_for_participant()
+    logger.info(f"Sandbox participant joined: {participant.identity}")
+
+    agent = SandboxAgent(instructions=SANDBOX_PROMPT)
 
     session = AgentSession(
+        llm=openai.realtime.RealtimeModel(
+            voice="ash",
+            temperature=0.7,
+        ),
         vad=silero.VAD.load(),
-        stt=deepgram.STT(model="nova-3"),
-        tts=_build_tts(),
-        llm=openai.LLM(model="gpt-4o-mini", temperature=0.7),
     )
 
     await session.start(agent=agent, room=ctx.room)
@@ -352,10 +344,10 @@ async def entrypoint(ctx: JobContext):
 
     Two modes:
     - Phone call mode: dispatched with metadata {phone_number, survey_id}
-    - Sandbox/browser mode: no metadata or no phone_number, just chat
+    - Sandbox/browser mode: no metadata, uses OpenAI Realtime for demo
     """
     logger.info(f"Connecting to room {ctx.room.name}")
-    await ctx.connect()
+    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     # Parse metadata -- sandbox connections may have none
     metadata = {}
@@ -373,10 +365,11 @@ async def entrypoint(ctx: JobContext):
         await _run_sandbox_mode(ctx)
         return
 
+    # ─── Phone call mode ─────────────────────────────────────────────
     participant_identity = f"sip_{phone_number}"
     logger.info(f"Starting survey call: survey={survey_id}, phone={phone_number}")
 
-    # 1. Fetch survey data from backend
+    # 1. Fetch survey data
     survey_data = fetch_survey_data(survey_id)
     if not survey_data:
         logger.error(f"Could not fetch survey data for {survey_id}")
@@ -430,18 +423,17 @@ async def entrypoint(ctx: JobContext):
         system_prompt=system_prompt,
     )
 
-    # 5. Create the voice pipeline session
+    # 5. Create the voice pipeline session using OpenAI Realtime
     session = AgentSession(
+        llm=openai.realtime.RealtimeModel(
+            voice="ash",
+            temperature=0.7,
+        ),
         vad=silero.VAD.load(),
-        stt=deepgram.STT(model="nova-3"),
-        tts=_build_tts(),
-        llm=openai.LLM(model="gpt-4o-mini", temperature=0.7),
     )
 
-    # 6. Start the agent session before dialing
-    session_started = asyncio.create_task(
-        session.start(agent=agent, room=ctx.room)
-    )
+    # 6. Start the session
+    await session.start(agent=agent, room=ctx.room)
 
     # 7. Dial the phone number via SIP
     try:
@@ -457,7 +449,6 @@ async def entrypoint(ctx: JobContext):
             )
         )
 
-        await session_started
         participant = await ctx.wait_for_participant(identity=participant_identity)
         logger.info(f"Participant joined: {participant.identity}")
 
@@ -479,5 +470,8 @@ if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
-        )
+            initialize_process_timeout=120.0,
+            job_memory_warn_mb=1000,
+            job_memory_limit_mb=1500,
+        ),
     )

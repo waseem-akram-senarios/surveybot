@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  voicebot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: survey-voicebot
+    ports:
+      - "8083:8083"
+    environment:
+      # LiveKit Configuration
+      - LIVEKIT_URL=${LIVEKIT_URL:-https://your-livekit-cloud-url}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-your-livekit-api-key}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-your-livekit-api-secret}
+      
+      # AI Service Providers
+      - DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY:-your-deepgram-api-key}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-your-openai-api-key}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-sk_b906d32dbb95f1c483a0c7a26a2f591eaec341ed98054525}
+      
+      # Voice Settings
+      - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID:-cgSgspJ2msm6clMCkdW9}
+      
+      # Organization
+      - ORGANIZATION_NAME=${ORGANIZATION_NAME:-IT Curves}
+      
+      # Model Settings
+      - STT_MODEL=${STT_MODEL:-nova-3}
+      - STT_LANGUAGE=${STT_LANGUAGE:-en}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.1}
+      - TTS_MODEL=${TTS_MODEL:-eleven_flash_v2_5}
+      
+      # Directories
+      - LOG_DIR=${LOG_DIR:-survey_logs}
+      - RESPONSES_DIR=${RESPONSES_DIR:-survey_responses}
+    
+    volumes:
+      # Mount local directories for persistent logs and responses
+      - ./survey_logs:/app/survey_logs
+      - ./survey_responses:/app/survey_responses
+      - ./.env:/app/.env:ro
+    
+    restart: unless-stopped
+    networks:
+      - survey-network
+
+networks:
+  survey-network:
+    driver: bridge

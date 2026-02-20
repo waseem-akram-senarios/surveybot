@@ -1,5 +1,5 @@
 # LiveKit Agents SDK
-livekit-agents==0.8.0
+livekit-agents>=0.7.0
 
 # STT Provider
 livekit-plugins-deepgram

@@ -10,6 +10,7 @@ class ApiLinks {
     static TEMPLATE_DELETE = `/api/templates/delete`;
     static TEMPLATE_ADD = `/api/templates/create`;
     static TEMPLATE_STATUS = `/api/templates/status`;
+    static TEMPLATE_UPDATE = `/api/templates/update`;
     static TEMPLATE_ADD_QUESTION = `/api/templates/addquestions`;
     static TEMPLATE_DELETE_QUESTION = `/api/templates/deletequestionbyidwithparentchild`;
     static TEMPLATE_TRANSLATE = `/api/templates/translate`;

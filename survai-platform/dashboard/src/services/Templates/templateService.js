@@ -65,6 +65,19 @@ class TemplateService {
     }
   }
 
+  static async updateTemplateConfig(templateName, config) {
+    try {
+      const response = await ApiBaseHelper.patch(ApiLinks.TEMPLATE_UPDATE, {
+        TemplateName: templateName,
+        ...config
+      });
+      return response;
+    } catch (error) {
+      console.error("Error updating template config:", error);
+      throw new Error("Failed to update template configuration. Please try again.");
+    }
+  }
+
   static async deleteTemplate(templateName) {
     try {
       const response = await ApiBaseHelper.delete(ApiLinks.TEMPLATE_DELETE, {

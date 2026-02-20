@@ -285,6 +285,58 @@ async def update_template_status(request: TemplateStatusUpdateP):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.patch(
+    "/templates/update",
+    status_code=201,
+    description="Update template configuration.",
+)
+async def update_template_config(request: dict):
+    try:
+        template_name = request.get("TemplateName")
+        if not template_name:
+            raise HTTPException(status_code=400, detail="TemplateName is required")
+        
+        # Check if template exists
+        res = sql_execute(
+            "SELECT * FROM templates WHERE name = :template_name",
+            {"template_name": template_name},
+        )
+        if not res:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Template with Name {template_name} not found",
+            )
+        
+        # Build update query dynamically based on provided fields
+        update_fields = []
+        params = {"template_name": template_name}
+        
+        # Handle ai_augmented field
+        if "ai_augmented" in request:
+            update_fields.append("ai_augmented = :ai_augmented")
+            params["ai_augmented"] = request["ai_augmented"]
+        
+        # Handle other fields
+        for field in ["max_questions", "time_limit_minutes", "frequency", "survey_type"]:
+            if field in request:
+                update_fields.append(f"{field} = :{field}")
+                params[field] = request[field]
+        
+        if update_fields:
+            sql = f"UPDATE templates SET {', '.join(update_fields)} WHERE name = :template_name"
+            sql_execute(sql, params)
+            
+            updated_fields = ", ".join([f.replace(" = ", ":") for f in update_fields])
+            return f"Template '{template_name}' updated successfully: {updated_fields}"
+        else:
+            return "No fields to update"
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post(
     "/templates/clone",
     status_code=201,

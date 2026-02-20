@@ -50,6 +50,7 @@ const CreateTemplateForm = () => {
     isLoading,
     createTemplate,
     updateTemplateStatus,
+    updateTemplateConfig,
     saveMultipleQuestions,
     editQuestionComplete,
     deleteQuestionComplete,
@@ -73,6 +74,9 @@ const CreateTemplateForm = () => {
     editMode ? markExistingQuestionsAsSaved(templateData?.questions) : []
   );
   const [editedQuestions, setEditedQuestions] = useState(new Set());
+  const [aiAugmented, setAiAugmented] = useState(
+    editMode ? templateData?.aiAugmented || false : true
+  );
   
   // Modal states
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -453,7 +457,14 @@ const CreateTemplateForm = () => {
           if (response.templateId || response.id) {
             setTemplateId(response.templateId || response.id);
           }
+          
+          // Save AI Augmented setting
+          await updateTemplateConfig(templateName.trim(), { ai_augmented: aiAugmented });
+          
           showSuccess("Template created successfully!");
+        } else {
+          // Update AI Augmented setting for existing template
+          await updateTemplateConfig(templateName, { ai_augmented: aiAugmented });
         }
         setCurrentStep(2);
       } catch (error) {
@@ -687,6 +698,8 @@ const CreateTemplateForm = () => {
             onTemplateNameChange={setTemplateName}
             currentStep={currentStep}
             viewMode={viewMode}
+            aiAugmented={aiAugmented}
+            onAiAugmentedChange={setAiAugmented}
           />
 
           {/* Questions Section */}

@@ -53,6 +53,20 @@ export const useTemplateAPI = () => {
     }
   };
 
+  const updateTemplateConfig = async (templateName, config) => {
+    setIsLoading(true);
+    clearError();
+
+    try {
+      const response = await TemplateService.updateTemplateConfig(templateName, config);
+      return response;
+    } catch (error) {
+      handleError(error, "Failed to update template configuration");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const deleteTemplate = async (templateName) => {
     setIsLoading(true);
     clearError();
@@ -506,6 +520,7 @@ export const useTemplateAPI = () => {
     // Template operations
     createTemplate,
     updateTemplateStatus,
+    updateTemplateConfig,
     deleteTemplate,
     cloneTemplate,
     fetchTemplates,

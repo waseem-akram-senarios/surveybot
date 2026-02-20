@@ -18,8 +18,8 @@ from prompts import DEFAULT_GLOBAL_PROMPT_EN, DEFAULT_GLOBAL_PROMPT_ES, MAX_SURV
 logger = logging.getLogger(__name__)
 
 VOICE_CONFIG = {
-    "en": {"model": "aura-2", "voiceId": "thalia", "provider": "deepgram"},
-    "es": {"model": "aura-2", "voiceId": "lucia", "provider": "deepgram"},
+    "en": {"model": "aura-2", "voiceId": "luna", "provider": "deepgram"},
+    "es": {"model": "aura-2", "voiceId": "luna", "provider": "deepgram"},
 }
 
 TRANSCRIBER_CONFIG = {
@@ -348,7 +348,7 @@ def _create_decline_node_conv(language="en", voice_cfg=None):
     if voice_cfg:
         node["voice"] = voice_cfg
     else:
-        node["voice"] = {"model": "aura-2", "voiceId": "thalia", "provider": "deepgram"}
+        node["voice"] = {"model": "aura-2", "voiceId": "luna", "provider": "deepgram"}
     return node
 
 
@@ -425,7 +425,7 @@ def _create_question_node(question, index, language="en", voice_cfg=None, rider_
     if voice_cfg:
         node["voice"] = {**voice_cfg, "mipOptOut": True}
     else:
-        node["voice"] = {"model": "aura-2", "voiceId": "thalia", "provider": "deepgram", "mipOptOut": True}
+        node["voice"] = {"model": "aura-2", "voiceId": "luna", "provider": "deepgram", "mipOptOut": True}
 
     if language == "es":
         node["transcriber"] = {"model": "nova-2", "provider": "deepgram", "language": "es"}

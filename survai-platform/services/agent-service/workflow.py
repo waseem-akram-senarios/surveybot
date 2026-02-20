@@ -29,8 +29,8 @@ VAPI_BASE_URL = "https://api.vapi.ai"
 
 # Spanish voice mapping
 VOICE_CONFIG = {
-    "en": {"model": "aura-2", "voiceId": "thalia", "provider": "deepgram"},
-    "es": {"model": "aura-2", "voiceId": "lucia", "provider": "deepgram"},
+    "en": {"model": "aura-2", "voiceId": "luna", "provider": "deepgram"},
+    "es": {"model": "aura-2", "voiceId": "luna", "provider": "deepgram"},
 }
 
 TRANSCRIBER_CONFIG = {
@@ -395,7 +395,7 @@ class VAPISurveyWorkflowGenerator:
         if voice_cfg:
             node["voice"] = voice_cfg
         else:
-            node["voice"] = {"model": "aura-2", "voiceId": "thalia", "provider": "deepgram"}
+            node["voice"] = {"model": "aura-2", "voiceId": "luna", "provider": "deepgram"}
         return node
 
     def _create_decline_node_tool(self):
@@ -469,7 +469,7 @@ class VAPISurveyWorkflowGenerator:
         if voice_cfg:
             node["voice"] = {**voice_cfg, "mipOptOut": True}
         else:
-            node["voice"] = {"model": "aura-2", "voiceId": "thalia", "provider": "deepgram", "mipOptOut": True}
+            node["voice"] = {"model": "aura-2", "voiceId": "luna", "provider": "deepgram", "mipOptOut": True}
 
         if language == "es":
             node["transcriber"] = {"model": "nova-2", "provider": "deepgram", "language": "es"}

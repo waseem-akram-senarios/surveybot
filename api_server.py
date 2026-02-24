@@ -24,7 +24,6 @@ from pydantic import BaseModel
 load_dotenv()
 
 app = FastAPI(title="Survey Bot Call API")
-AGENT_NAME = "survey-agent"
 
 
 class CallRequest(BaseModel):
@@ -43,7 +42,7 @@ async def trigger_call(req: CallRequest):
     try:
         await lkapi.agent_dispatch.create_dispatch(
             lkapi_module.CreateAgentDispatchRequest(
-                agent_name=AGENT_NAME,
+                agent_name="survey-agent",
                 room=room_name,
                 metadata=json.dumps({"phone_number": req.phone_number}),
             )

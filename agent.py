@@ -62,37 +62,38 @@ async def entrypoint(ctx: JobContext):
         4. Run the survey session once the rider picks up.
     """
     # Parse phone number from dispatch metadata
-    phone_number = json.loads(ctx.job.metadata or "{}").get("phone_number")
-    if not phone_number:
-        logger.error("No phone_number found in job metadata — aborting job.")
-        return
-
-    logger.info(f"Outbound call requested to {phone_number} in room {ctx.room.name}")
+    metadata = json.loads(ctx.job.metadata or "{}")
+    phone_number = metadata.get("phone_number")
 
     # Connect to the room
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
-    # Place the outbound SIP call — blocks until the rider answers or the call fails
-    try:
-        await ctx.api.sip.create_sip_participant(
-            api.CreateSIPParticipantRequest(
-                room_name=ctx.room.name,
-                sip_trunk_id=SIP_OUTBOUND_TRUNK_ID,
-                sip_call_to=phone_number,
-                participant_identity=phone_number,
-                wait_until_answered=True,
+    if phone_number:
+        # === OUTBOUND CALL MODE ===
+        logger.info(f"Outbound call requested to {phone_number} in room {ctx.room.name}")
+        try:
+            await ctx.api.sip.create_sip_participant(
+                api.CreateSIPParticipantRequest(
+                    room_name=ctx.room.name,
+                    sip_trunk_id=SIP_OUTBOUND_TRUNK_ID,
+                    sip_call_to=phone_number,
+                    participant_identity=phone_number,
+                    wait_until_answered=True,
+                )
             )
-        )
-        logger.info(f"Rider answered: {phone_number}")
-    except Exception as e:
-        logger.error(f"Outbound call to {phone_number} failed: {e}")
-        return
-
-    # Wait for the SIP participant to appear in the room
-    participant = await ctx.wait_for_participant()
-    logger.info(f"Starting survey for participant {participant.identity}")
-
-    caller_number = phone_number
+            logger.info(f"Rider answered: {phone_number}")
+        except Exception as e:
+            logger.error(f"Outbound call to {phone_number} failed: {e}")
+            return
+        participant = await ctx.wait_for_participant()
+        logger.info(f"Starting survey for participant {participant.identity}")
+        caller_number = phone_number
+    else:
+        # === SANDBOX / BROWSER MODE ===
+        logger.info(f"Sandbox mode — waiting for browser participant in room {ctx.room.name}")
+        participant = await ctx.wait_for_participant()
+        logger.info(f"Sandbox participant joined: {participant.identity}")
+        caller_number = participant.identity or "sandbox-user"
 
     # Set up per-call logging
     log_filename, log_handler = setup_survey_logging(ctx.room.name, caller_number)
@@ -177,7 +178,7 @@ if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
-            agent_name="survey-agent",  # Must match the agent_name used in make_call.py dispatch
+            agent_name="survey-agent",
             initialize_process_timeout=WORKER_INITIALIZE_TIMEOUT,
             job_memory_warn_mb=JOB_MEMORY_WARN_MB,
             job_memory_limit_mb=JOB_MEMORY_LIMIT_MB,

@@ -1,33 +1,23 @@
 FROM python:3.10-slim
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     pkg-config \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
 COPY . .
 
-# Create necessary directories
 RUN mkdir -p survey_logs survey_responses
 
-# Expose port (if needed for HTTP server)
-EXPOSE 8083
-
-# Environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Run the application
-CMD ["python", "agent.py", "start"]
+EXPOSE 8000 8083
+
+CMD ["bash", "start.sh"]

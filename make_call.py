@@ -30,7 +30,6 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("make-call")
 
-AGENT_NAME = "survey-agent"
 
 
 async def make_call(phone_number: str) -> None:
@@ -52,10 +51,10 @@ async def make_call(phone_number: str) -> None:
 
     lkapi = api.LiveKitAPI()
     try:
-        logger.info(f"Dispatching agent '{AGENT_NAME}' to room '{room_name}'")
+        logger.info(f"Dispatching agent to room '{room_name}'")
         await lkapi.agent_dispatch.create_dispatch(
             api.CreateAgentDispatchRequest(
-                agent_name=AGENT_NAME,
+                agent_name="survey-agent",
                 room=room_name,
                 metadata=json.dumps({"phone_number": phone_number}),
             )

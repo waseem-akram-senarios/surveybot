@@ -16,27 +16,14 @@ class SurveyAgent(Agent):
     and guiding the participant through the survey questions.
     """
     
-    def __init__(self, instructions: str, rider_first_name: str, **kwargs):
-        """
-        Initialize the survey agent.
-        
-        Args:
-            instructions: The system prompt/instructions for the agent
-            rider_first_name: The rider's first name for personalized greeting
-            **kwargs: Additional arguments passed to parent Agent class
-        """
+    def __init__(self, instructions: str, rider_first_name: str, organization_name: str = None, **kwargs):
         super().__init__(instructions=instructions, **kwargs)
         self.rider_first_name = rider_first_name
+        self.organization_name = organization_name or ORGANIZATION_NAME
     
     async def on_enter(self):
-        """
-        Called when agent enters - AI speaks first.
-        
-        This method initiates the conversation by greeting the participant
-        immediately when the call connects.
-        """
-        # Generate the first greeting immediately
+        """Called when agent enters - AI speaks first."""
         await self.session.say(
-            f"Hi, this is Jane with {ORGANIZATION_NAME}. Am I speaking to {self.rider_first_name}?"
+            f"Hi, this is Jane with {self.organization_name}. Am I speaking to {self.rider_first_name}?"
         )
 

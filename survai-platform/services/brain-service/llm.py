@@ -289,6 +289,24 @@ def analyze_survey(combined_text: str) -> Dict[str, Any]:
         }
 
 
+# ─── Quick Generate ───────────────────────────────────────────────────────────
+
+def quick_generate(prompt: str) -> str:
+    """Quick single-turn generation for short tasks like greetings."""
+    client = _get_client()
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=200,
+        )
+        return resp.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error(f"quick_generate error: {e}")
+        return ""
+
+
 # ─── Filter ───────────────────────────────────────────────────────────────────
 
 def filter_question(biodata: str, question: str) -> str:

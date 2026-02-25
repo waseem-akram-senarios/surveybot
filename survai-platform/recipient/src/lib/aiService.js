@@ -60,7 +60,7 @@ export async function shouldSkipQuestion(questionId, previousAnswers) {
 }
 
 // Generate personalized greeting
-export async function generatePersonalizedGreeting(riderName, surveyName, language = "en") {
+export async function generatePersonalizedGreeting(recipientName, surveyName, language = "en", biodata = "") {
   try {
     const response = await fetch(
       `${API_BASE_URL}/api/brain/generate-greeting`,
@@ -70,28 +70,27 @@ export async function generatePersonalizedGreeting(riderName, surveyName, langua
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          riderName,
+          recipientName,
           surveyName,
           language,
+          biodata,
         }),
       }
     );
     
     if (!response.ok) {
-      // Fallback to simple greeting
       return language === "es" 
-        ? `¡Hola ${riderName || ''}! 👋`
-        : `Hi ${riderName || ''}! 👋`;
+        ? `¡Hola ${recipientName || ''}! 👋`
+        : `Hi ${recipientName || ''}! 👋`;
     }
     
     const data = await response.json();
     return data.greeting;
   } catch (error) {
     console.error("Error generating greeting:", error);
-    // Fallback to simple greeting
     return language === "es" 
-      ? `¡Hola ${riderName || ''}! 👋`
-      : `Hi ${riderName || ''}! 👋`;
+      ? `¡Hola ${recipientName || ''}! 👋`
+      : `Hi ${recipientName || ''}! 👋`;
   }
 }
 

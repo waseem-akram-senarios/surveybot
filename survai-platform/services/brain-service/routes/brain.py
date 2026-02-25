@@ -379,24 +379,50 @@ async def should_skip_endpoint(req: dict):
 
 @router.post("/generate-greeting")
 async def generate_greeting_endpoint(req: dict):
-    """Generate a personalized greeting."""
+    """Generate a personalized greeting based on recipient name, survey context, and biodata."""
     try:
-        rider_name = req.get("riderName", "")
+        recipient_name = req.get("recipientName") or req.get("riderName", "")
         survey_name = req.get("surveyName", "")
         language = req.get("language", "en")
-        
+        biodata = req.get("biodata", "")
+
+        if biodata and recipient_name:
+            try:
+                prompt = (
+                    f"Generate a warm, personalized 3-line greeting for a survey recipient.\n"
+                    f"Recipient name: {recipient_name}\n"
+                    f"Survey: {survey_name}\n"
+                    f"Recipient background: {biodata}\n"
+                    f"Language: {'Spanish' if language == 'es' else 'English'}\n\n"
+                    f"Rules:\n"
+                    f"- Line 1: Warm greeting with their name and a relevant personal touch based on their background\n"
+                    f"- Line 2: Brief mention of the survey purpose, adapted to their context\n"
+                    f"- Line 3: Encouragement to participate (keep it short)\n"
+                    f"- Each line separated by \\n\n"
+                    f"- Use emoji sparingly (1-2 max)\n"
+                    f"- Keep it concise and respectful\n"
+                    f"- Return ONLY the 3 lines, nothing else"
+                )
+                ai_greeting = llm.quick_generate(prompt)
+                if ai_greeting and len(ai_greeting.strip()) > 10:
+                    return {"greeting": ai_greeting.strip()}
+            except Exception as e:
+                logger.warning(f"AI greeting generation failed, using template: {e}")
+
+        name_part = f", {recipient_name}" if recipient_name else ""
         if language == "es":
-            greeting = f"¡Hola{rider_name and f', {rider_name}' or ''}! 👋"
+            greeting = f"¡Hola{name_part}! 👋"
             greeting += "\nSoy tu asistente de encuesta de IA. Estoy aquí para recopilar tus comentarios de forma rápida y sencilla."
+            greeting += "\nSolo toma unos minutos. ¡Tu opinión importa! 🙏"
         else:
-            greeting = f"Hi{rider_name and f', {rider_name}' or ''}! 👋"
+            greeting = f"Hi{name_part}! 👋"
             greeting += "\nI'm your AI survey assistant. I'm here to collect your feedback quickly and easily."
-        
+            greeting += "\nIt only takes a few minutes. Your opinion matters! 🙏"
+
         return {"greeting": greeting}
     except Exception as e:
         logger.error(f"Generate greeting error: {e}")
-        # Fallback greeting
-        return {"greeting": f"Hi{req.get('riderName', '')}! 👋"}
+        return {"greeting": f"Hi{', ' + (req.get('recipientName') or req.get('riderName', '')) if (req.get('recipientName') or req.get('riderName')) else ''}! 👋"}
 
 
 @router.post("/suggest-answer")

@@ -217,8 +217,12 @@ export default function Survey() {
             Survey Complete
           </h2>
           
-          <p className="text-base md:text-lg text-gray-600 leading-relaxed mb-12" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <p className="text-base md:text-lg text-gray-600 leading-relaxed mb-8" style={{ fontFamily: 'Poppins, sans-serif' }}>
             Congratulations. You have successfully completed the survey. We will use this data to make our products and services even better in the future.
+          </p>
+
+          <p className="text-sm text-gray-400 mb-12" style={{ fontFamily: 'Poppins, sans-serif' }}>
+            You can safely close this window.
           </p>
 
           {/* Rating section */}

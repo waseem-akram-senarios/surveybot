@@ -105,7 +105,7 @@ async def get_survey_questions(survey_id: str) -> dict:
 async def get_survey_recipient(survey_id: str) -> dict:
     """Get recipient info for a survey."""
     rows = sql_execute(
-        "SELECT recipient, name, ride_id, tenant_id, rider_name FROM surveys WHERE id = :survey_id",
+        "SELECT recipient, name, ride_id, tenant_id, rider_name, biodata FROM surveys WHERE id = :survey_id",
         {"survey_id": survey_id},
     )
     if not rows:
@@ -118,6 +118,7 @@ async def get_survey_recipient(survey_id: str) -> dict:
         "Name": r["name"],
         "RideID": r["ride_id"],
         "TenantID": r["tenant_id"],
+        "Biodata": r.get("biodata", ""),
         "RiderName": r["rider_name"],
     }
 

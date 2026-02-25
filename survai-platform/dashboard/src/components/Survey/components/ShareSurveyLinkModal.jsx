@@ -18,7 +18,18 @@ const ShareSurveyLinkModal = ({ open, onClose, surveyLink = "https://survey.ai/s
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(surveyLink);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(surveyLink);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = surveyLink;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {

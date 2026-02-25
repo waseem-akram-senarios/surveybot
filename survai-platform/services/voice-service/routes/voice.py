@@ -117,6 +117,16 @@ async def make_call(
 
         try:
             rider_data = get_rider_data(rider_name=rider_name, phone=rider_phone)
+            if not rider_data:
+                rider_data = {}
+            if not rider_data.get("name") and rider_name:
+                rider_data["name"] = rider_name
+            if not rider_data.get("phone") and rider_phone:
+                rider_data["phone"] = rider_phone
+            survey_biodata = survey.get("biodata", "")
+            if survey_biodata and not rider_data.get("biodata"):
+                rider_data["biodata"] = survey_biodata
+
             async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.post(
                     f"{BRAIN_SERVICE_URL}/api/brain/build-system-prompt",

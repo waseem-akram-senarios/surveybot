@@ -28,6 +28,7 @@ export default function Survey() {
   const [recipientName, setRecipientName] = useState("");
   const [riderName, setRiderName] = useState("");
   const [surveyName, setSurveyName] = useState("");
+  const [biodata, setBiodata] = useState("");
   const [lang, setLang] = useState("en");
   const [visibleLines, setVisibleLines] = useState(0);
   const [personalizedGreeting, setPersonalizedGreeting] = useState("");
@@ -44,15 +45,20 @@ export default function Survey() {
       setRecipientName(result.Recipient || "");
       setRiderName(result.RiderName || "");
       setSurveyName(result.Name || "");
+      setBiodata(result.Biodata || "");
       if (result.Name) setLang(detectLanguage(result.Name));
       
       // Generate AI-powered personalized greeting
       try {
-        const greeting = await generatePersonalizedGreeting(result.RiderName, result.Name, lang);
+        const greeting = await generatePersonalizedGreeting(
+          result.Recipient || result.RiderName,
+          result.Name,
+          lang,
+          result.Biodata || ""
+        );
         setPersonalizedGreeting(greeting);
       } catch (error) {
         console.error("Failed to generate AI greeting:", error);
-        // Fallback to default greeting
       }
     } catch (error) {
       console.error("Error fetching recipient info:", error);
@@ -235,7 +241,7 @@ export default function Survey() {
                   lineHeight: 1.5,
                 }}
               >
-                {personalizedGreeting ? (personalizedGreeting.split('\n')[i] || getLine(riderName, lang)) : getLine(riderName, lang)}
+                {personalizedGreeting ? (personalizedGreeting.split('\n')[i] || getLine(recipientName || riderName, lang)) : getLine(recipientName || riderName, lang)}
               </Typography>
             </Box>
           )

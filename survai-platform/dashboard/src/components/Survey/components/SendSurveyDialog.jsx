@@ -94,10 +94,27 @@ const SendSurveyDialog = ({
     onConfirmPhone(phone, voiceProvider);
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(surveyLink);
-    // You might want to show a toast notification here
-    console.log("Link copied to clipboard");
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyLink = async () => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(surveyLink);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = surveyLink;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
   };
 
   const handleClose = () => {
@@ -185,9 +202,16 @@ const SendSurveyDialog = ({
               </Typography>
               <IconButton
                 onClick={handleCopyLink}
-                sx={{ ml: 1, color: "#666" }}
+                sx={{ ml: 1, color: copied ? "#4CAF50" : "#666" }}
+                title={copied ? "Copied!" : "Copy link"}
               >
-                <ContentCopy />
+                {copied ? (
+                  <Typography sx={{ fontSize: "12px", fontFamily: "Poppins, sans-serif", color: "#4CAF50", fontWeight: 500 }}>
+                    Copied!
+                  </Typography>
+                ) : (
+                  <ContentCopy />
+                )}
               </IconButton>
             </Box>
           </Box>
@@ -216,7 +240,7 @@ const SendSurveyDialog = ({
                 }}
               >
                 <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "12px", color: "#7A5C00" }}>
-                  <strong>Note:</strong> Email delivery requires a verified sender domain in MailerSend. If no email arrives, check your spam folder or contact your admin to verify the sender domain.
+                  <strong>Note:</strong> If no email arrives, check your spam folder. Free-tier email providers may only deliver to verified addresses. Contact your admin to set up a custom sender domain.
                 </Typography>
               </Box>
               <Box sx={{ display: "flex", alignItems: "center" }}>

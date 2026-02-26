@@ -94,7 +94,7 @@ class SystemPromptRequest(BaseModel):
     questions: List[Dict[str, Any]]
     rider_data: Optional[Dict[str, Any]] = None
     company_name: str = "the transit agency"
-    time_limit_minutes: int = 8
+    time_limit_minutes: int = 5
     restricted_topics: Optional[List[str]] = None
 
 

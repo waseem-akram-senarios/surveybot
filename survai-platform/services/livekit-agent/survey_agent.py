@@ -3,6 +3,8 @@ Survey Agent class definition.
 Contains the main Agent that conducts customer surveys.
 """
 
+import asyncio
+
 from livekit.agents.voice import Agent
 
 from config.settings import ORGANIZATION_NAME
@@ -23,6 +25,9 @@ class SurveyAgent(Agent):
     
     async def on_enter(self):
         """Called when agent enters - AI speaks first."""
+        # Brief delay to let the SIP audio channel stabilize after answer
+        await asyncio.sleep(1.0)
+
         name = self.rider_first_name
         if name and name.lower() not in ("customer", "unknown", ""):
             greeting = f"Hi, this is Cameron, an AI assistant calling on behalf of {self.organization_name}. Am I speaking with {name}?"

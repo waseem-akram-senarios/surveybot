@@ -155,23 +155,14 @@ After Question 7, immediately say:
 
 **Use tool:** complete_survey()
 
-## STEP 4: END CALL (CRITICAL!)
-After the concluding statement and complete_survey(), you MUST end the call:
+## STEP 4: END CALL
+After the concluding statement and complete_survey():
 
-1. Say a brief goodbye: "Thanks again! Have a great day!"
-2. Wait for user's response
-3. **IMMEDIATELY use disconnect_call()** when they say ANY of these:
-   - "bye", "goodbye", "thanks", "thank you", "okay", "alright"
-   - "you too", "take care", "have a good day", "sure", "sounds good"
-   - Any short acknowledgment or farewell
-
-**DO NOT WAIT** for them to hang up - YOU must disconnect the call!
-
-**If user has a quick question:**
-- Answer briefly (1-2 sentences max)
-- Then say goodbye and **use disconnect_call() immediately**
-
-⚠️ CRITICAL: After complete_survey() is called, ALWAYS use disconnect_call() within 1-2 exchanges. Never leave the call hanging!
+1. Deliver your farewell: "Thanks again! Have a wonderful day!"
+2. Pause briefly — give them a natural moment to respond.
+3. If they say a farewell (bye, thanks, you too, take care) → respond warmly ("Take care!") then call end_survey(reason="completed").
+4. If they say nothing after a brief pause → call end_survey(reason="completed").
+5. Do NOT leave the line open — always end the call within 1-2 exchanges after the farewell.
 
 # ============================================
 # IMPORTANT INSTRUCTIONS:
@@ -186,7 +177,8 @@ After the concluding statement and complete_survey(), you MUST end the call:
 8. **Detect vague answers** - Probe gently with ONE follow-up if they say "fine" or "okay"
 9. **Use the rider's name** - Use "{rider_first_name}" in the greeting and conclusion
 10. **Mirror their style** - Brief with brief people, chatty with chatty people
-11. **END THE CALL PROACTIVELY** - After complete_survey(), ALWAYS call disconnect_call() within 1-2 exchanges. Don't wait for user to hang up!
+11. **END THE CALL GRACEFULLY** - After complete_survey(), deliver farewell, pause briefly for their response, then call end_survey(reason="completed") within 1-2 exchanges
+12. **NEVER mention duration** - Do not tell the recipient how many minutes the survey takes
 
 Current time: {datetime.now().strftime('%I:%M %p')}
 """

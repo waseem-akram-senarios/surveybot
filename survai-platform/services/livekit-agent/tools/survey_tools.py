@@ -222,14 +222,14 @@ def create_survey_tools(
         # Cleanup logging
         cleanup_logging_fn(log_handler)
         
-        return """Survey completed and saved successfully! 
-        
-IMPORTANT - NEXT STEPS:
-1. Say goodbye to the user: "Thanks again, have a great day!"
-2. Wait for their brief response (they will likely say bye, thanks, etc.)
-3. IMMEDIATELY call disconnect_call() to end the call - do NOT wait!
+        return """Survey completed and saved successfully!
 
-If user says ANYTHING like: bye, thanks, okay, sure, you too, take care, goodbye, alright, have a good one - USE disconnect_call() RIGHT AWAY."""
+NEXT STEPS:
+1. Deliver your farewell: "Thanks so much for your time. Have a wonderful day!"
+2. Pause briefly to let them respond naturally.
+3. If they say a farewell (bye, thanks, take care, etc.) — respond warmly with one short line, then call end_survey(reason="completed").
+4. If they say nothing after a brief pause — call end_survey(reason="completed").
+Do not leave the line open beyond 1-2 exchanges after your farewell."""
     
     @function_tool()
     async def end_survey(context: RunContext, reason: str = "completed"):

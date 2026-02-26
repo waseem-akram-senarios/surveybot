@@ -3,6 +3,7 @@ Survey function tools.
 These are the tools that the LLM can call during the survey conversation.
 """
 
+import asyncio
 from datetime import datetime
 from typing import Optional, Callable
 
@@ -207,29 +208,25 @@ def create_survey_tools(
     @function_tool()
     async def complete_survey(context: RunContext):
         """
-        Mark survey as completed and prepare to end call.
-        Called after concluding statement.
+        Mark survey as completed, save responses, and end the call.
+        The call will automatically disconnect after a brief delay.
         """
         survey_responses["completed"] = True
         logger.info("✅ Survey completed successfully!")
         
-        # Calculate call duration
         call_duration = (datetime.now() - call_start_time).total_seconds()
-        
-        # Save responses
         save_survey_responses(caller_number, survey_responses, call_duration)
-        
-        # Cleanup logging
         cleanup_logging_fn(log_handler)
         
-        return """Survey completed and saved successfully! 
-        
-IMPORTANT - NEXT STEPS:
-1. Say goodbye to the user: "Thanks again, have a great day!"
-2. Wait for their brief response (they will likely say bye, thanks, etc.)
-3. IMMEDIATELY call disconnect_call() to end the call - do NOT wait!
+        async def _auto_disconnect():
+            await asyncio.sleep(8)
+            logger.info("⏱️ Auto-disconnect triggered (post-survey timeout)")
+            if disconnect_fn:
+                await disconnect_fn()
 
-If user says ANYTHING like: bye, thanks, okay, sure, you too, take care, goodbye, alright, have a good one - USE disconnect_call() RIGHT AWAY."""
+        asyncio.create_task(_auto_disconnect())
+        
+        return "Survey saved! Say a warm goodbye and the call will end automatically."
     
     @function_tool()
     async def end_survey(context: RunContext, reason: str = "completed"):
@@ -263,21 +260,14 @@ If user says ANYTHING like: bye, thanks, okay, sure, you too, take care, goodbye
     async def disconnect_call(context: RunContext):
         """
         Disconnect and end the phone call immediately.
-        
-        MUST USE THIS after complete_survey() when user says ANY of:
-        - bye, goodbye, thanks, thank you, okay, alright, sure
-        - you too, take care, have a good day, sounds good
-        - Any short acknowledgment or farewell response
-        
-        DO NOT wait for user to hang up - YOU must call this to end the call!
+        Use this to hang up the call after saying goodbye.
         """
         logger.info("📞 Ending call - disconnect_call triggered")
         
         if disconnect_fn:
             await disconnect_fn()
-            return "Call disconnected successfully."
-        else:
-            return "Call will end shortly."
+            return "Call disconnected."
+        return "Call will end shortly."
     
     # Return all tools as a list
     return [

@@ -1,7 +1,7 @@
 """
 Database operations for the Voice Service.
-Owns: call_transcripts table
-Reads: surveys, survey_response_items, questions, templates, riders
+Uses async SQLAlchemy + asyncpg for non-blocking DB access on the call path.
+Keeps a sync engine for backward compat (store_transcript, etc.).
 """
 
 import json
@@ -12,30 +12,44 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from sqlalchemy import create_engine, text
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
 
 logger = logging.getLogger(__name__)
 
-_engine = None
+_sync_engine = None
+_async_engine: Optional[AsyncEngine] = None
+
+
+def _db_url(driver: str = "psycopg2") -> str:
+    db_host = os.getenv("DB_HOST", "localhost")
+    db_port = os.getenv("DB_PORT", "5432")
+    db_user = os.getenv("DB_USER", "pguser")
+    db_password = os.getenv("DB_PASSWORD", "root")
+    db_name = os.getenv("DB_NAME", "db")
+    return f"postgresql+{driver}://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
 
 def get_engine():
-    global _engine
-    if _engine is None:
-        db_host = os.getenv("DB_HOST", "localhost")
-        db_port = os.getenv("DB_PORT", "5432")
-        db_user = os.getenv("DB_USER", "pguser")
-        db_password = os.getenv("DB_PASSWORD", "root")
-        db_name = os.getenv("DB_NAME", "db")
-        url = f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-        _engine = create_engine(
-            url,
-            pool_size=5,
-            max_overflow=10,
-            pool_pre_ping=True,
-            pool_recycle=300,
+    global _sync_engine
+    if _sync_engine is None:
+        _sync_engine = create_engine(
+            _db_url("psycopg2"),
+            pool_size=5, max_overflow=10, pool_pre_ping=True, pool_recycle=300,
         )
-    return _engine
+    return _sync_engine
 
+
+def get_async_engine() -> AsyncEngine:
+    global _async_engine
+    if _async_engine is None:
+        _async_engine = create_async_engine(
+            _db_url("asyncpg"),
+            pool_size=5, max_overflow=10, pool_pre_ping=True, pool_recycle=300,
+        )
+    return _async_engine
+
+
+# ─── Sync helper (for non-critical paths) ────────────────────────────────────
 
 def sql_execute(query: str, params: dict = None) -> list:
     engine = get_engine()
@@ -50,11 +64,26 @@ def sql_execute(query: str, params: dict = None) -> list:
             return []
 
 
-# ─── Survey Data Loading ─────────────────────────────────────────────────────
+# ─── Async helper (for the call-initiation hot path) ─────────────────────────
 
-def get_survey_with_questions(survey_id: str) -> Optional[Dict[str, Any]]:
-    """Load a survey and all its questions — single query with LEFT JOIN for parent mappings."""
-    survey = sql_execute(
+async def async_execute(query: str, params: dict = None) -> list:
+    engine = get_async_engine()
+    async with engine.connect() as conn:
+        result = await conn.execute(text(query), params or {})
+        if result.returns_rows:
+            rows = result.fetchall()
+            columns = result.keys()
+            return [dict(zip(columns, row)) for row in rows]
+        else:
+            await conn.commit()
+            return []
+
+
+# ─── Survey Data Loading (async — used on call path) ─────────────────────────
+
+async def get_survey_with_questions(survey_id: str) -> Optional[Dict[str, Any]]:
+    """Load a survey and all its questions — fully async, no N+1."""
+    survey = await async_execute(
         """SELECT s.id, s.template_name, s.biodata, s.name, s.recipient,
                   s.phone, s.rider_name, s.ride_id, s.tenant_id, s.url,
                   s.status, s.email
@@ -65,7 +94,7 @@ def get_survey_with_questions(survey_id: str) -> Optional[Dict[str, Any]]:
         return None
     survey = survey[0]
 
-    questions = sql_execute(
+    questions = await async_execute(
         """SELECT q.id, q.text, q.criteria, q.scales, q.parent_id, q.autofill,
                   sri.ord as "order",
                   COALESCE(
@@ -82,7 +111,7 @@ def get_survey_with_questions(survey_id: str) -> Optional[Dict[str, Any]]:
     child_ids = [q["id"] for q in questions if q.get("parent_id")]
     parent_map: Dict[str, list] = {}
     if child_ids:
-        mappings = sql_execute(
+        mappings = await async_execute(
             """SELECT qcm.child_question_id, qc.text
                FROM question_category_mappings qcm
                JOIN question_categories qc ON qc.id = qcm.parent_category_id
@@ -95,7 +124,6 @@ def get_survey_with_questions(survey_id: str) -> Optional[Dict[str, Any]]:
     for q in questions:
         if q.get("parent_id"):
             q["parent_category_texts"] = parent_map.get(q["id"], [])
-
         if isinstance(q.get("categories"), str):
             try:
                 q["categories"] = json.loads(q["categories"])
@@ -106,33 +134,28 @@ def get_survey_with_questions(survey_id: str) -> Optional[Dict[str, Any]]:
     return survey
 
 
-def get_rider_data(rider_name: str = None, phone: str = None) -> Optional[Dict[str, Any]]:
-    """Load rider data by phone or name in a single query."""
+async def get_rider_data(rider_name: str = None, phone: str = None) -> Optional[Dict[str, Any]]:
     if not rider_name and not phone:
         return None
-
     if phone:
-        riders = sql_execute(
+        riders = await async_execute(
             "SELECT * FROM riders WHERE phone = :phone LIMIT 1",
             {"phone": phone},
         )
         if riders:
             return riders[0]
-
     if rider_name:
-        riders = sql_execute(
+        riders = await async_execute(
             "SELECT * FROM riders WHERE name ILIKE :name LIMIT 1",
             {"name": f"%{rider_name}%"},
         )
         if riders:
             return riders[0]
-
     return None
 
 
-def get_template_config(template_name: str) -> Dict[str, Any]:
-    """Get template configuration."""
-    templates = sql_execute(
+async def get_template_config(template_name: str) -> Dict[str, Any]:
+    templates = await async_execute(
         """SELECT name, status,
                   COALESCE(time_limit_minutes, 8) as time_limit_minutes,
                   COALESCE(restricted_topics, '{}') as restricted_topics,
@@ -153,7 +176,7 @@ def get_template_config(template_name: str) -> Dict[str, Any]:
     }
 
 
-# ─── Transcript Storage ──────────────────────────────────────────────────────
+# ─── Transcript Storage (sync — called after call, not latency-critical) ─────
 
 def store_transcript(
     survey_id: str,
@@ -164,10 +187,8 @@ def store_transcript(
     channel: str = "phone",
     call_id: str = None,
 ) -> str:
-    """Store a call transcript."""
     transcript_id = str(uuid4())
     now = datetime.now(timezone.utc).isoformat()
-
     sql_execute(
         """INSERT INTO call_transcripts
            (id, survey_id, full_transcript, call_duration_seconds,
@@ -175,30 +196,22 @@ def store_transcript(
            VALUES (:id, :survey_id, :transcript, :duration,
                    :started, :ended, :status, :attempts, :channel)""",
         {
-            "id": transcript_id,
-            "survey_id": survey_id,
-            "transcript": full_transcript,
-            "duration": call_duration_seconds,
-            "started": now,
-            "ended": now,
-            "status": call_status,
-            "attempts": call_attempts,
-            "channel": channel,
+            "id": transcript_id, "survey_id": survey_id,
+            "transcript": full_transcript, "duration": call_duration_seconds,
+            "started": now, "ended": now, "status": call_status,
+            "attempts": call_attempts, "channel": channel,
         },
     )
-
     if call_id:
         sql_execute(
             "UPDATE surveys SET call_id = :call_id WHERE id = :survey_id",
             {"call_id": call_id, "survey_id": survey_id},
         )
-
     logger.info(f"Stored transcript {transcript_id} for survey {survey_id}")
     return transcript_id
 
 
 def get_transcript(survey_id: str) -> Optional[Dict[str, Any]]:
-    """Get the transcript for a survey."""
     transcripts = sql_execute(
         """SELECT * FROM call_transcripts
            WHERE survey_id = :survey_id
@@ -209,17 +222,12 @@ def get_transcript(survey_id: str) -> Optional[Dict[str, Any]]:
 
 
 def record_answer(survey_id: str, question_id: str, raw_answer: str) -> bool:
-    """Record a survey answer from the voice agent's tool call."""
     try:
         sql_execute(
             """UPDATE survey_response_items
                SET raw_answer = :raw_answer
                WHERE survey_id = :survey_id AND question_id = :question_id""",
-            {
-                "survey_id": survey_id,
-                "question_id": question_id,
-                "raw_answer": raw_answer,
-            },
+            {"survey_id": survey_id, "question_id": question_id, "raw_answer": raw_answer},
         )
         logger.info(f"Recorded answer for survey={survey_id}, question={question_id}")
         return True
@@ -229,7 +237,6 @@ def record_answer(survey_id: str, question_id: str, raw_answer: str) -> bool:
 
 
 def update_survey_status(survey_id: str, status: str = "Completed") -> bool:
-    """Update survey status and completion date."""
     try:
         now = datetime.now(timezone.utc).isoformat()[:19].replace("T", " ")
         sql_execute(

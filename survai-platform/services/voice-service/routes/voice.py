@@ -22,6 +22,7 @@ from db import (
     get_transcript,
     record_answer,
     sql_execute,
+    async_execute,
     store_transcript,
     update_survey_status,
 )
@@ -53,7 +54,7 @@ async def make_call(
     provider: str = "livekit",
 ):
     """Initiate an AI-powered survey call via LiveKit SIP."""
-    survey = get_survey_with_questions(survey_id)
+    survey = await get_survey_with_questions(survey_id)
     if not survey:
         raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
 
@@ -69,16 +70,16 @@ async def make_call(
     rider_name = survey.get("rider_name") or survey.get("recipient") or ""
     rider_phone = survey.get("phone") or phone
 
-    loop = asyncio.get_event_loop()
-    template_config_future = loop.run_in_executor(
-        None, get_template_config, template_name
-    ) if template_name else None
-    rider_data_future = loop.run_in_executor(
-        None, get_rider_data, rider_name, rider_phone
-    )
+    coros = []
+    if template_name:
+        coros.append(get_template_config(template_name))
+    coros.append(get_rider_data(rider_name, rider_phone))
 
-    template_config = (await template_config_future) if template_config_future else {}
-    rider_data = await rider_data_future
+    results = await asyncio.gather(*coros)
+    if template_name:
+        template_config, rider_data = results[0], results[1]
+    else:
+        template_config, rider_data = {}, results[0]
 
     language = "en"
     if template_name:
@@ -138,7 +139,7 @@ async def make_call(
         call_id = result.get("call_id", "")
         if call_id:
             try:
-                sql_execute(
+                await async_execute(
                     "UPDATE surveys SET call_id = :call_id WHERE id = :sid",
                     {"call_id": call_id, "sid": survey_id},
                 )
@@ -259,6 +260,14 @@ async def send_email_fallback(
 
     logger.error(f"All email fallback methods failed for survey {survey_id} to {email}")
     return {"status": "failed", "error": "All email providers failed", "survey_url": survey_url}
+
+
+# ─── Direct call endpoint (dashboard calls this via gateway, skipping survey-service hop)
+
+@router.post("/direct-call")
+async def direct_call(to: str, survey_id: str, provider: str = "livekit"):
+    """Dashboard-compatible endpoint: accepts 'to' param instead of 'phone'."""
+    return await make_call(survey_id=survey_id, phone=to, provider=provider)
 
 
 # ─── Backward Compatibility Aliases ──────────────────────────────────────────

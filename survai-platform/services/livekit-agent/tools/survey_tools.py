@@ -17,7 +17,7 @@ from utils.storage import save_survey_responses
 
 logger = get_logger()
 
-HANGUP_DELAY_SECONDS = 2.0
+HANGUP_DELAY_SECONDS = 5.0
 
 
 def create_survey_tools(
@@ -59,20 +59,21 @@ def create_survey_tools(
                 return (
                     f"Recorded {question_id}. "
                     f"ALL {total_questions} questions are done. "
-                    f"Say goodbye and call end_survey(reason='completed') NOW."
+                    f"Say your full goodbye message to the person, then call end_survey(reason='completed')."
                 )
         return f"Recorded {question_id}."
 
     @function_tool()
     async def end_survey(context: RunContext, reason: str = "completed"):
         """
-        End the survey and hang up the call immediately.
-        MUST be called after saying goodbye, or if the person is unavailable or wrong person.
+        Save survey data and schedule the call to hang up after a delay.
+        IMPORTANT: Only call this AFTER you have already spoken your full goodbye message.
+        The call will stay connected for a few more seconds so the person hears your farewell.
 
         Args:
             reason: Why the call is ending — completed, wrong_person, declined, not_available
         """
-        logger.info(f"📞 Ending call — reason: {reason}")
+        logger.info(f"📞 Ending call — reason: {reason} (hanging up in {HANGUP_DELAY_SECONDS}s)")
         survey_responses["end_reason"] = reason
         survey_responses["completed"] = reason == "completed"
 
@@ -80,6 +81,7 @@ def create_survey_tools(
         save_survey_responses(caller_number, survey_responses, call_duration)
         cleanup_logging_fn(log_handler)
 
+        # Wait long enough for TTS to finish speaking the goodbye
         await asyncio.sleep(HANGUP_DELAY_SECONDS)
 
         if disconnect_fn:

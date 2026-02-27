@@ -200,10 +200,22 @@ async def build_system_prompt_endpoint(req: SystemPromptRequest):
         rider_data = req.rider_data or {}
         restricted_topics = req.restricted_topics or []
 
-        _placeholder_names = {"customer", "unknown", "rider", "rider1", "rider2", "user", "recipient", "test", "n/a", "na", "none"}
+        import re as _re
+        _placeholder_names = {"customer", "unknown", "user", "recipient", "test", "n/a", "na", "none", "name"}
+        _placeholder_pattern = _re.compile(r"^(rider|user|customer|recipient|test)\s*\d*$", _re.IGNORECASE)
+
+        def _is_real_name(n: str) -> bool:
+            if not n or not n.strip():
+                return False
+            if n.strip().lower() in _placeholder_names:
+                return False
+            if _placeholder_pattern.match(n.strip()):
+                return False
+            return len(_re.sub(r"[^a-zA-Z]", "", n)) >= 2
+
         if rider_data and any(rider_data.values()):
             rider_name = rider_data.get("name", "")
-            if rider_name and rider_name.strip().lower() not in _placeholder_names:
+            if _is_real_name(rider_name):
                 rider_lines = [f"- Name: {rider_name}"]
             else:
                 rider_name = ""

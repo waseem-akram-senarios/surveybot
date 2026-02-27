@@ -27,7 +27,13 @@ def get_engine():
         db_password = os.getenv("DB_PASSWORD", "root")
         db_name = os.getenv("DB_NAME", "db")
         url = f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-        _engine = create_engine(url, pool_size=5, max_overflow=10, pool_pre_ping=True)
+        _engine = create_engine(
+            url,
+            pool_size=5,
+            max_overflow=10,
+            pool_pre_ping=True,
+            pool_recycle=300,
+        )
     return _engine
 
 
@@ -47,7 +53,7 @@ def sql_execute(query: str, params: dict = None) -> list:
 # ─── Survey Data Loading ─────────────────────────────────────────────────────
 
 def get_survey_with_questions(survey_id: str) -> Optional[Dict[str, Any]]:
-    """Load a survey and all its questions with categories and branching info."""
+    """Load a survey and all its questions — single query with LEFT JOIN for parent mappings."""
     survey = sql_execute(
         """SELECT s.id, s.template_name, s.biodata, s.name, s.recipient,
                   s.phone, s.rider_name, s.ride_id, s.tenant_id, s.url,
@@ -73,16 +79,22 @@ def get_survey_with_questions(survey_id: str) -> Optional[Dict[str, Any]]:
         {"survey_id": survey_id},
     )
 
+    child_ids = [q["id"] for q in questions if q.get("parent_id")]
+    parent_map: Dict[str, list] = {}
+    if child_ids:
+        mappings = sql_execute(
+            """SELECT qcm.child_question_id, qc.text
+               FROM question_category_mappings qcm
+               JOIN question_categories qc ON qc.id = qcm.parent_category_id
+               WHERE qcm.child_question_id = ANY(:child_ids)""",
+            {"child_ids": child_ids},
+        )
+        for m in mappings:
+            parent_map.setdefault(m["child_question_id"], []).append(m["text"])
+
     for q in questions:
         if q.get("parent_id"):
-            mappings = sql_execute(
-                """SELECT qc.text
-                   FROM question_category_mappings qcm
-                   JOIN question_categories qc ON qc.id = qcm.parent_category_id
-                   WHERE qcm.child_question_id = :question_id""",
-                {"question_id": q["id"]},
-            )
-            q["parent_category_texts"] = [m["text"] for m in mappings]
+            q["parent_category_texts"] = parent_map.get(q["id"], [])
 
         if isinstance(q.get("categories"), str):
             try:
@@ -95,7 +107,7 @@ def get_survey_with_questions(survey_id: str) -> Optional[Dict[str, Any]]:
 
 
 def get_rider_data(rider_name: str = None, phone: str = None) -> Optional[Dict[str, Any]]:
-    """Load rider data by name or phone."""
+    """Load rider data by phone or name in a single query."""
     if not rider_name and not phone:
         return None
 

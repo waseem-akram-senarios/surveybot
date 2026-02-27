@@ -49,6 +49,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 VOICE_SERVICE_URL = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8017")
+SCHEDULER_SERVICE_URL = os.getenv("SCHEDULER_SERVICE_URL", "http://scheduler-service:8070")
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -817,37 +818,23 @@ async def sendemail(email: Email):
 
 @router.post("/surveys/callback")
 async def schedule_callback(request: CallbackRequest):
-    """Schedule callback. Uses APScheduler to call makecall after delay_minutes."""
-    from scheduler import scheduler
-
-    run_at = datetime.utcnow() + timedelta(minutes=request.delay_minutes)
-    job_id = f"callback_{request.survey_id}_{request.phone.replace('+', '')}"
+    """Schedule callback via scheduler-service (single scheduler instance)."""
+    delay_seconds = request.delay_minutes * 60
     try:
-        job = scheduler.add_job(
-            _run_makecall_sync,
-            "date",
-            run_date=run_at,
-            args=[request.survey_id, request.phone, request.provider],
-            id=job_id,
-        )
-        return {"job_id": job.id, "run_at": str(run_at), "message": "Callback scheduled"}
-    except Exception as e:
-        logger.error(f"Failed to schedule callback: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-def _run_makecall_sync(survey_id: str, phone: str, provider: str):
-    """Synchronous wrapper for makecall (for APScheduler)."""
-    import asyncio
-
-    async def _call():
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            await client.post(
-                f"{VOICE_SERVICE_URL}/api/voice/make-call",
-                params={"survey_id": survey_id, "phone": phone, "provider": provider},
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{SCHEDULER_SERVICE_URL}/api/scheduler/schedule-call",
+                params={
+                    "survey_id": request.survey_id,
+                    "phone": request.phone,
+                    "delay_seconds": delay_seconds,
+                },
             )
-
-    asyncio.run(_call())
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.error(f"Failed to schedule callback via scheduler-service: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ─── Aliases for frontend backward compatibility ─────────────────────────────

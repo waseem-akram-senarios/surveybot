@@ -1,35 +1,44 @@
 """
 Scheduler routes: schedule calls, campaigns, cancel jobs, list jobs.
+Jobs persist in Postgres — survive container restarts.
 """
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import uuid4
 
 import httpx
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from fastapi import APIRouter, HTTPException
 
-from db import sql_execute
+from db import get_engine, sql_execute
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/scheduler", tags=["scheduler"])
 
 _scheduler: Optional[BackgroundScheduler] = None
-_jobs: dict = {}  # job_id -> {run_at, survey_id, phone, ...}
+
+MAX_RETRIES = 2
+RETRY_DELAY_SECONDS = 10
 
 
 def get_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is None:
-        _scheduler = BackgroundScheduler()
+        engine = get_engine()
+        jobstore = SQLAlchemyJobStore(engine=engine)
+        _scheduler = BackgroundScheduler(
+            jobstores={"default": jobstore},
+            job_defaults={"coalesce": True, "max_instances": 1},
+        )
     return _scheduler
 
 
-def _make_call_job(survey_id: str, phone: str):
-    """Background job: call voice-service /api/voice/make-call."""
+def _make_call_job(survey_id: str, phone: str, attempt: int = 1):
+    """Background job: call voice-service with retry."""
     voice_url = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8017")
     url = f"{voice_url}/api/voice/make-call"
     try:
@@ -38,7 +47,18 @@ def _make_call_job(survey_id: str, phone: str):
             r.raise_for_status()
             logger.info(f"Scheduled call completed: survey={survey_id}, phone={phone}")
     except Exception as e:
-        logger.error(f"Scheduled call failed: survey={survey_id}, phone={phone}, error={e}")
+        logger.error(f"Scheduled call failed (attempt {attempt}/{MAX_RETRIES+1}): survey={survey_id}, error={e}")
+        if attempt <= MAX_RETRIES:
+            sched = get_scheduler()
+            retry_at = datetime.now(timezone.utc) + timedelta(seconds=RETRY_DELAY_SECONDS * attempt)
+            sched.add_job(
+                _make_call_job,
+                "date",
+                run_date=retry_at,
+                args=[survey_id, phone, attempt + 1],
+                id=f"retry_{survey_id}_{attempt + 1}",
+            )
+            logger.info(f"Retrying in {RETRY_DELAY_SECONDS * attempt}s (attempt {attempt + 1})")
 
 
 @router.post("/schedule-call")
@@ -47,14 +67,10 @@ async def schedule_call(
     phone: str,
     delay_seconds: int = 60,
 ):
-    """
-    Schedule a delayed call. Adds APScheduler job that calls voice-service /api/voice/make-call.
-    """
+    """Schedule a delayed call. Job persists in Postgres."""
     try:
         job_id = str(uuid4())
-        run_at = datetime.now(timezone.utc)
-        from datetime import timedelta
-        run_at = run_at + timedelta(seconds=delay_seconds)
+        run_at = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
 
         sched = get_scheduler()
         sched.add_job(
@@ -62,15 +78,8 @@ async def schedule_call(
             "date",
             run_date=run_at,
             id=job_id,
-            args=[survey_id, phone],
+            args=[survey_id, phone, 1],
         )
-        _jobs[job_id] = {
-            "job_id": job_id,
-            "run_at": run_at.isoformat(),
-            "survey_id": survey_id,
-            "phone": phone,
-            "type": "call",
-        }
 
         return {
             "status": "scheduled",
@@ -90,9 +99,7 @@ async def schedule_campaign(
     frequency: str = "daily",
     next_run_offset_minutes: int = 0,
 ):
-    """
-    Schedule a recurring campaign. Creates APScheduler job for campaign execution.
-    """
+    """Schedule a recurring campaign. Job persists in Postgres."""
     try:
         campaign = sql_execute("SELECT * FROM campaigns WHERE id = :id", {"id": campaign_id})
         if not campaign:
@@ -100,7 +107,6 @@ async def schedule_campaign(
 
         job_id = str(uuid4())
         sched = get_scheduler()
-        trigger = "interval"
         if frequency == "daily":
             interval_hours = 24
         elif frequency == "weekly":
@@ -110,11 +116,10 @@ async def schedule_campaign(
         else:
             interval_hours = 24
 
-        from datetime import timedelta
         run_date = datetime.now(timezone.utc) + timedelta(minutes=next_run_offset_minutes)
 
         def _campaign_job():
-            """Execute campaign: find all pending surveys for this campaign and trigger calls."""
+            """Execute campaign: find all pending surveys and trigger calls."""
             logger.info(f"Campaign job executing: {campaign_id}")
             try:
                 surveys = sql_execute(
@@ -133,7 +138,7 @@ async def schedule_campaign(
                                 params={"survey_id": survey["id"], "phone": survey["phone"]},
                             )
                             r.raise_for_status()
-                            logger.info(f"Campaign call triggered: survey={survey['id']}, rider={survey.get('rider_name')}")
+                            logger.info(f"Campaign call triggered: survey={survey['id']}")
                     except Exception as call_err:
                         logger.error(f"Campaign call failed for survey {survey['id']}: {call_err}")
                 logger.info(f"Campaign {campaign_id}: triggered {len(surveys)} calls")
@@ -147,12 +152,6 @@ async def schedule_campaign(
             id=job_id,
             start_date=run_date,
         )
-        _jobs[job_id] = {
-            "job_id": job_id,
-            "campaign_id": campaign_id,
-            "frequency": frequency,
-            "type": "campaign",
-        }
 
         return {
             "status": "scheduled",
@@ -176,7 +175,6 @@ async def cancel_job(job_id: str):
             sched.remove_job(job_id)
         except Exception:
             pass
-        _jobs.pop(job_id, None)
         return {"status": "cancelled", "job_id": job_id}
     except Exception as e:
         logger.error(f"Cancel job error: {e}")
@@ -190,11 +188,10 @@ async def list_jobs():
         sched = get_scheduler()
         jobs = []
         for j in sched.get_jobs():
-            meta = _jobs.get(j.id, {})
             jobs.append({
                 "job_id": j.id,
                 "next_run": j.next_run_time.isoformat() if j.next_run_time else None,
-                **meta,
+                "name": j.name,
             })
         return {"jobs": jobs}
     except Exception as e:

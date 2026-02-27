@@ -5,7 +5,6 @@ Manages surveys, answers, campaigns, and riders.
 
 import sys
 
-# Add /app first (for local db.py), then /app for shared.models access
 sys.path.insert(0, "/app")
 
 
@@ -16,7 +15,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routes.surveys import router as surveys_router
-from scheduler import scheduler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,14 +23,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Survey Service starting up...")
-    if not scheduler.running:
-        scheduler.start()
-        logger.info("APScheduler started")
     yield
     logger.info("Survey Service shutting down...")
-    if scheduler.running:
-        scheduler.shutdown(wait=False)
-        logger.info("APScheduler stopped")
 
 
 app = FastAPI(

@@ -7,6 +7,7 @@ Handles LiveKit call lifecycle:
 - Email fallback
 """
 
+import asyncio
 import logging
 import os
 from typing import Optional
@@ -30,6 +31,20 @@ router = APIRouter(prefix="/api/voice", tags=["voice"])
 
 BRAIN_SERVICE_URL = os.getenv("BRAIN_SERVICE_URL", "http://brain-service:8016")
 
+_brain_client: Optional[httpx.AsyncClient] = None
+
+
+def _get_brain_client() -> httpx.AsyncClient:
+    """Singleton HTTP client for brain-service — reuses TCP connections."""
+    global _brain_client
+    if _brain_client is None or _brain_client.is_closed:
+        _brain_client = httpx.AsyncClient(
+            base_url=BRAIN_SERVICE_URL,
+            timeout=15.0,
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+        )
+    return _brain_client
+
 
 @router.post("/make-call")
 async def make_call(
@@ -51,9 +66,19 @@ async def make_call(
         raise HTTPException(status_code=500, detail="LIVEKIT_URL not configured")
 
     template_name = survey.get("template_name", "")
-    template_config = get_template_config(template_name) if template_name else {}
     rider_name = survey.get("rider_name") or survey.get("recipient") or ""
     rider_phone = survey.get("phone") or phone
+
+    loop = asyncio.get_event_loop()
+    template_config_future = loop.run_in_executor(
+        None, get_template_config, template_name
+    ) if template_name else None
+    rider_data_future = loop.run_in_executor(
+        None, get_rider_data, rider_name, rider_phone
+    )
+
+    template_config = (await template_config_future) if template_config_future else {}
+    rider_data = await rider_data_future
 
     language = "en"
     if template_name:
@@ -74,7 +99,6 @@ async def make_call(
     }
 
     try:
-        rider_data = get_rider_data(rider_name=rider_name, phone=rider_phone)
         if not rider_data:
             rider_data = {}
         if not rider_data.get("name") and rider_name:
@@ -85,21 +109,21 @@ async def make_call(
         if survey_biodata and not rider_data.get("biodata"):
             rider_data["biodata"] = survey_biodata
 
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(
-                f"{BRAIN_SERVICE_URL}/api/brain/build-system-prompt",
-                json={
-                    "survey_name": template_name or f"Survey {survey_id}",
-                    "questions": questions,
-                    "rider_data": rider_data,
-                    "company_name": company_name,
-                },
-            )
-            if resp.status_code == 200:
-                survey_context["system_prompt"] = resp.json().get("system_prompt", "")
-                logger.info(f"Built brain-service prompt for LiveKit call ({len(survey_context['system_prompt'])} chars)")
-            else:
-                logger.warning(f"Brain-service prompt failed ({resp.status_code}), agent will use defaults")
+        client = _get_brain_client()
+        resp = await client.post(
+            "/api/brain/build-system-prompt",
+            json={
+                "survey_name": template_name or f"Survey {survey_id}",
+                "questions": questions,
+                "rider_data": rider_data,
+                "company_name": company_name,
+            },
+        )
+        if resp.status_code == 200:
+            survey_context["system_prompt"] = resp.json().get("system_prompt", "")
+            logger.info(f"Built brain-service prompt for LiveKit call ({len(survey_context['system_prompt'])} chars)")
+        else:
+            logger.warning(f"Brain-service prompt failed ({resp.status_code}), agent will use defaults")
     except Exception as e:
         logger.warning(f"Brain-service unreachable for LiveKit prompt: {e}, agent will use defaults")
 
@@ -150,9 +174,7 @@ async def send_email_fallback(
     email: str,
     survey_url: str,
 ):
-    """Send an email survey link as fallback when call fails or is declined.
-    Uses the same MailerSend -> Resend -> SMTP fallback chain as survey-service.
-    """
+    """Send an email survey link as fallback when call fails or is declined."""
     subject = "We'd love your feedback!"
     html_body = f"""
     <html>

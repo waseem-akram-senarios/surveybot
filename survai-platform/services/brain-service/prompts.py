@@ -186,35 +186,27 @@ After the final question:
 """
 
 QUESTION_FORMAT_SCALE = """
-TOPIC {order}: {question_id} - RATING
-   Ask: "{question_text}"
-   Scale: 1-{scale_max}. Weave it in naturally -- "If you had to put a number on it..." or "On a scale of 1 to {scale_max}?"
-   INTELLIGENCE: If their previous answers already suggest a clear rating, confirm it: "Sounds like you'd rate that pretty high, maybe a 4 or 5?"
-   Skip if a previous answer already clearly indicates the rating for this topic.
+TOPIC {order}: {question_id} - RATING (1-{scale_max})
+   "{question_text}"
+   Weave naturally: "On a scale of 1 to {scale_max}?" Skip if already covered.
 """
 
 QUESTION_FORMAT_CATEGORICAL = """
-TOPIC {order}: {question_id} - CHOICE
-   Ask: "{question_text}"
-   Categories: {categories}
-   Let them answer naturally. Only offer options if they seem unsure.
-   INTELLIGENCE: If a previous answer already placed them in a category, confirm rather than re-ask.
-   Skip if already covered by a previous response.
+TOPIC {order}: {question_id} - CHOICE [{categories}]
+   "{question_text}"
+   Let them answer naturally. Only offer options if unsure. Skip if covered.
 """
 
 QUESTION_FORMAT_OPEN = """
 TOPIC {order}: {question_id} - OPEN
-   Ask: "{question_text}"
-   Let them talk freely. If answer is vague (<5 words), ask ONE follow-up.
-   INTELLIGENCE: If they already shared relevant details in a prior answer, acknowledge it and ask only what's new.
-   Capture emotions, specific incidents, and actionable suggestions.
+   "{question_text}"
+   If vague, ONE follow-up. Skip if covered.
 """
 
 QUESTION_FORMAT_BRANCH = """
-TOPIC {order}: {question_id} - CONDITIONAL
-   Trigger: Only ask if they mentioned {trigger_categories} in topic {parent_order}
-   Ask: "{question_text}"
-   INTELLIGENCE: Skip entirely if the trigger condition wasn't met. Don't even acknowledge this question exists.
+TOPIC {order}: {question_id} - CONDITIONAL (only if {trigger_categories} in topic {parent_order})
+   "{question_text}"
+   Skip if trigger not met.
 """
 
 # ─── Smart Follow-up Prompts ─────────────────────────────────────────────────

@@ -36,8 +36,9 @@ class SurveyAgent(Agent):
         return clean not in PLACEHOLDER_NAMES and len(clean) >= 2
 
     async def on_enter(self):
-        """Called when agent enters - AI speaks first after a brief pause."""
-        await asyncio.sleep(1.2)
+        """Called when agent enters - AI speaks first."""
+        # Brief delay to let the SIP audio channel stabilize after answer
+        await asyncio.sleep(1.0)
 
         name = self.rider_first_name
         org = self.organization_name

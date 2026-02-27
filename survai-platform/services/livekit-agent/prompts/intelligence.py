@@ -49,7 +49,7 @@ SYMPATHIZE_PROMPT = (
     "Examples:\n"
     "- Positive: 'That's great to hear!' / 'Glad that went well!'\n"
     "- Negative: 'I'm sorry about that.' / 'That sounds frustrating.'\n"
-    "- Neutral: 'Got it, thanks.' / 'Understood.'\n"
+    "- Neutral: 'That makes sense, thank you.' / 'I appreciate that.'\n"
     "- Detailed: 'I appreciate you sharing that.' / 'That's really helpful feedback.'"
 )
 

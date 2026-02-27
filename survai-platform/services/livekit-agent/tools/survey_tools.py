@@ -218,15 +218,14 @@ def create_survey_tools(
         save_survey_responses(caller_number, survey_responses, call_duration)
         cleanup_logging_fn(log_handler)
         
-        async def _auto_disconnect():
-            await asyncio.sleep(8)
-            logger.info("⏱️ Auto-disconnect triggered (post-survey timeout)")
-            if disconnect_fn:
-                await disconnect_fn()
+        return """Survey completed and saved successfully!
 
-        asyncio.create_task(_auto_disconnect())
-        
-        return "Survey saved! Say a warm goodbye and the call will end automatically."
+NEXT STEPS:
+1. Deliver your farewell: "Thanks so much for your time. Have a wonderful day!"
+2. Pause briefly to let them respond naturally.
+3. If they say a farewell (bye, thanks, take care, etc.) — respond warmly with one short line, then call end_survey(reason="completed").
+4. If they say nothing after a brief pause — call end_survey(reason="completed").
+Do not leave the line open beyond 1-2 exchanges after your farewell."""
     
     @function_tool()
     async def end_survey(context: RunContext, reason: str = "completed"):

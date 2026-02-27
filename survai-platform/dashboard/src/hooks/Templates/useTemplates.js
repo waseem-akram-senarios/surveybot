@@ -359,66 +359,82 @@ export const useTemplateAPI = () => {
     }
   };
 
+  const retryAsync = async (fn, retries = 2, delayMs = 500) => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        if (attempt === retries) throw err;
+        await new Promise(r => setTimeout(r, delayMs * (attempt + 1)));
+      }
+    }
+  };
+
+  const saveAndLinkQuestion = async (templateName, question, order) => {
+    await retryAsync(() => saveQuestion(question));
+    await retryAsync(() => addQuestionToTemplate(templateName, question.queId, order));
+  };
+
+  const saveAndLinkFlowQuestion = async (templateName, question, startOrder) => {
+    await retryAsync(() => saveFlowQuestions(question));
+    await retryAsync(() => addQuestionToTemplate(templateName, question.queId, startOrder));
+
+    let childOrder = startOrder + 1;
+    const linkPromises = [];
+    for (const [, childQuestions] of Object.entries(question.childQuestions)) {
+      for (const childQuestion of childQuestions) {
+        const ord = childOrder++;
+        linkPromises.push(retryAsync(() => addQuestionToTemplate(templateName, childQuestion.queId, ord)));
+      }
+    }
+    await Promise.all(linkPromises);
+    return childOrder;
+  };
+
   // Combined operations
   const saveMultipleQuestions = async (templateName, allQuestions) => {
     setIsLoading(true);
     clearError();
 
     try {
-      // Filter out only unsaved questions
       const unsavedQuestions = allQuestions.filter((q) => !q.isSaved);
+      if (unsavedQuestions.length === 0) return;
 
-      if (unsavedQuestions.length === 0) {
-        return;
-      }
-
-      // Calculate the next order based on existing saved questions
       let nextOrder = calculateNextOrder(allQuestions);
 
-      // Process each unsaved question
-      for (let i = 0; i < unsavedQuestions.length; i++) {
-        const question = unsavedQuestions[i];
+      const BATCH_SIZE = 3;
+      for (let batchStart = 0; batchStart < unsavedQuestions.length; batchStart += BATCH_SIZE) {
+        const batch = unsavedQuestions.slice(batchStart, batchStart + BATCH_SIZE);
 
-        try {
-          // Save the question(s) based on type
-          if (question.type === 'flow') {
-            await saveFlowQuestions(question);
-            
-            // Add parent question to template
-            await addQuestionToTemplate(templateName, question.queId, nextOrder);
-            
-            // Add all child questions to template with incremental orders
-            let childOrder = nextOrder + 1;
-            for (const [_, childQuestions] of Object.entries(question.childQuestions)) {
-              for (const childQuestion of childQuestions) {
-                await addQuestionToTemplate(templateName, childQuestion.queId, childOrder);
-                childOrder++;
-              }
-            }
-            
-            // Update nextOrder to account for the parent question and all child questions
-            const totalChildQuestions = Object.values(question.childQuestions).flat().length;
-            nextOrder = nextOrder + totalChildQuestions + 1;
+        const orderMap = [];
+        let tempOrder = nextOrder;
+        for (const q of batch) {
+          orderMap.push(tempOrder);
+          if (q.type === 'flow') {
+            const totalChildren = Object.values(q.childQuestions).flat().length;
+            tempOrder += totalChildren + 1;
           } else {
-            // Handle regular questions (category, rating, open)
-            await saveQuestion(question);
-            await addQuestionToTemplate(templateName, question.queId, nextOrder);
-            
-            // Increment nextOrder for the next regular question
-            nextOrder++;
+            tempOrder++;
           }
-          
-          console.log(`Successfully saved question: ${question.type} - ${question.question}`);
-        } catch (error) {
-          console.error(`Failed to save question "${question.question}":`, error);
-          throw new Error(`Failed to save question "${question.question}": ${error.message}`);
         }
+
+        await Promise.all(
+          batch.map((question, idx) => {
+            const order = orderMap[idx];
+            if (question.type === 'flow') {
+              return saveAndLinkFlowQuestion(templateName, question, order);
+            }
+            return saveAndLinkQuestion(templateName, question, order);
+          })
+        );
+
+        nextOrder = tempOrder;
       }
 
       console.log("All questions saved successfully");
     } catch (error) {
       console.error("Error in saveMultipleQuestions:", error);
-      handleError(error, "Failed to save multiple questions");
+      throw error;
     } finally {
       setIsLoading(false);
     }

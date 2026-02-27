@@ -4,6 +4,12 @@ import {
   useMediaQuery,
   Snackbar,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
 } from "@mui/material";
 import SearchBar from "../sharedTableComponents/SearchBar";
 import MobileTableCard from "./components/MobileTableCard";
@@ -11,9 +17,10 @@ import DesktopTable from "./components/DesktopTable";
 import TablePagination from "../sharedTableComponents/TablePagination";
 import { filterData, paginateData, sortData } from "../../utils/Surveys/surveyTableHelpers";
 import { useSurvey } from "../../hooks/Surveys/useSurvey";
+import SurveyService from "../../services/Surveys/surveyService";
 import SendSurveyDialog from "../Survey/components/SendSurveyDialog";
 
-const DashboardTable = ({ tableData = [], onRowClick }) => {  
+const DashboardTable = ({ tableData = [], onRowClick, onDataChange }) => {  
   const [search, setSearch] = useState("");
   const [orderBy, setOrderBy] = useState("LaunchDate");
   const [order, setOrder] = useState("desc");
@@ -21,7 +28,10 @@ const DashboardTable = ({ tableData = [], onRowClick }) => {
   const [page, setPage] = useState(1);
   
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedSurvey, setSelectedSurvey] = useState(null);
+  const [deletingSurvey, setDeletingSurvey] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   
@@ -111,6 +121,29 @@ const DashboardTable = ({ tableData = [], onRowClick }) => {
     }
   };
 
+  const handleDeleteSurvey = (item) => {
+    setDeletingSurvey(item);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingSurvey) return;
+    setIsDeleting(true);
+    try {
+      await SurveyService.deleteSurvey(deletingSurvey.SurveyId);
+      setSuccessMessage(`Survey "${deletingSurvey.Name}" deleted successfully`);
+      setShowSuccess(true);
+      if (onDataChange) onDataChange();
+    } catch (error) {
+      setSuccessMessage(`Failed to delete survey: ${error.message}`);
+      setShowSuccess(true);
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+      setDeletingSurvey(null);
+    }
+  };
+
   const handleSuccessClose = (event, reason) => {
     if (reason === 'clickaway') {
       return;
@@ -159,6 +192,7 @@ const DashboardTable = ({ tableData = [], onRowClick }) => {
           onSort={handleSort}
           onSendEmail={handleSendEmail}
           onSendPhone={handleSendPhone}
+          onDeleteSurvey={handleDeleteSurvey}
         />
       )}
 
@@ -181,6 +215,43 @@ const DashboardTable = ({ tableData = [], onRowClick }) => {
         isSendingEmail={isSendingEmail}
         isSendingPhone={isSendingSMS}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => !isDeleting && setDeleteDialogOpen(false)}
+      >
+        <DialogTitle sx={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600 }}>
+          Delete Survey
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ fontFamily: 'Poppins, sans-serif' }}>
+            Are you sure you want to delete survey "{deletingSurvey?.Name}"? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setDeleteDialogOpen(false)}
+            disabled={isDeleting}
+            sx={{ fontFamily: 'Poppins, sans-serif', textTransform: 'none', color: '#666' }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
+            disabled={isDeleting}
+            variant="contained"
+            sx={{
+              fontFamily: 'Poppins, sans-serif',
+              textTransform: 'none',
+              backgroundColor: '#D32F2F',
+              '&:hover': { backgroundColor: '#B71C1C' },
+            }}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Success Message Snackbar */}
       <Snackbar

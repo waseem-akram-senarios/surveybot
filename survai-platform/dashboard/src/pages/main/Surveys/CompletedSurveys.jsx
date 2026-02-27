@@ -20,6 +20,8 @@ const CompletedSurveys = () => {
     statsError,
     tableError,
     globalLoading,
+    refetchStats,
+    refetchTable,
   } = useCompletedSurveys();
 
   const handleSurveyClick = (surveyData) => {
@@ -70,6 +72,7 @@ const CompletedSurveys = () => {
         loading={tableLoading} 
         error={tableError}
         onRowClick={handleSurveyClick}
+        onDataChange={() => { refetchStats(); refetchTable(); }}
       />
     </Box>
   );

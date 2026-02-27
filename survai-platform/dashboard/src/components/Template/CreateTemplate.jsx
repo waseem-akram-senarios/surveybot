@@ -560,8 +560,10 @@ const CreateTemplateForm = () => {
       return;
     }
 
+    setShowPublishModal(false);
+    setIsSaving(true);
+
     try {
-      // Save any unsaved questions before publishing
       if (unsavedQuestions.length > 0) {
         await saveMultipleQuestions(templateName, questions);
         const savedIds = unsavedQuestions.map(q => q.id);
@@ -570,15 +572,14 @@ const CreateTemplateForm = () => {
 
       await updateTemplateStatus(templateName, "Published");
       
-      // Clear edited questions set
       setEditedQuestions(new Set());
-      
       showSuccess("Template published successfully!");
-      setShowPublishModal(false);
       window.location.href = '/templates/manage';
     } catch (error) {
       console.error("Failed to publish template:", error);
       showError("Failed to publish template. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
   };
 

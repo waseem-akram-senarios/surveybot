@@ -13,7 +13,10 @@ import {
   Button,
   Box,
   IconButton,
+  Tooltip,
 } from '@mui/material';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { truncateText, formatDate } from '../../../utils/Surveys/surveyTableHelpers';
 import SendSurveyButton from '../../../assets/SendSurvey.svg';
 
@@ -24,6 +27,7 @@ const DesktopTable = ({
   order, 
   onSort,
   onSendEmail,
+  onDeleteSurvey,
 }) => {
   const columns = [
     { id: "SurveyId", label: "ID", sortable: true },
@@ -46,6 +50,11 @@ const DesktopTable = ({
   const handleSendEmail = (item, e) => {
     e.stopPropagation();
     onSendEmail(item);
+  };
+
+  const handleDeleteSurvey = (item, e) => {
+    e.stopPropagation();
+    if (onDeleteSurvey) onDeleteSurvey(item);
   };
 
   return (
@@ -159,14 +168,46 @@ const DesktopTable = ({
                 />
               </TableCell>
               <TableCell>
-                {item.Status !== "Completed" && <Box className="action-buttons" sx={{ display: "flex", gap: 1 }}>
-                  <IconButton
-                    sx={{borderRadius: '15px', width: '142px', height: '40px'}}
-                    onClick={(e) => handleSendEmail(item, e)}
-                  >
-                    <img src={SendSurveyButton} alt="Send Survey" />
-                  </IconButton>
-                </Box>}
+                <Box className="action-buttons" sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                  {item.Status !== "Completed" && (
+                    <IconButton
+                      sx={{borderRadius: '15px', width: '142px', height: '40px'}}
+                      onClick={(e) => handleSendEmail(item, e)}
+                    >
+                      <img src={SendSurveyButton} alt="Send Survey" />
+                    </IconButton>
+                  )}
+                  {item.Status === "Completed" && (
+                    <Tooltip title="View Results">
+                      <IconButton
+                        onClick={(e) => { e.stopPropagation(); onItemClick(item); }}
+                        sx={{
+                          borderRadius: '10px',
+                          border: '1px solid #E0E0E0',
+                          width: '36px',
+                          height: '36px',
+                          '&:hover': { backgroundColor: '#F0F4FF', borderColor: '#1958F7' },
+                        }}
+                      >
+                        <VisibilityOutlinedIcon sx={{ fontSize: 18, color: '#1958F7' }} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  <Tooltip title="Delete Survey">
+                    <IconButton
+                      onClick={(e) => handleDeleteSurvey(item, e)}
+                      sx={{
+                        borderRadius: '10px',
+                        border: '1px solid #E0E0E0',
+                        width: '36px',
+                        height: '36px',
+                        '&:hover': { backgroundColor: '#FFF0F0', borderColor: '#D32F2F' },
+                      }}
+                    >
+                      <DeleteOutlineIcon sx={{ fontSize: 18, color: '#D32F2F' }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
               </TableCell>
             </TableRow>
           ))}

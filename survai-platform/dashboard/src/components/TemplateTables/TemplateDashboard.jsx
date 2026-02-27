@@ -8,6 +8,7 @@ const TemplateTable = ({ tableData: initialTableData, refreshTable, setNavigatio
     loadTemplateDetails,
     cloneTemplate,
     deleteTemplate,
+    updateTemplateStatus,
   } = useTemplateTableOperations();
 
   const navigate = useNavigate();
@@ -63,6 +64,12 @@ const TemplateTable = ({ tableData: initialTableData, refreshTable, setNavigatio
     return result;
   };
 
+  const handleStatusToggle = async (template) => {
+    const newStatus = template.status === "Published" ? "Draft" : "Published";
+    const result = await updateTemplateStatus(template.originalName, newStatus);
+    return result;
+  };
+
   return (
     <TemplateTableBase
       tableData={initialTableData}
@@ -71,6 +78,7 @@ const TemplateTable = ({ tableData: initialTableData, refreshTable, setNavigatio
       onTemplateClick={handleTemplateNameClick}
       onCloneTemplate={handleCloneTemplate}
       onDeleteTemplate={handleDeleteTemplate}
+      onStatusToggle={handleStatusToggle}
       columns={columns}
       dataMapper={templateDataMapper}
       refreshTable={refreshTable}

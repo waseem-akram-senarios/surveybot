@@ -70,13 +70,24 @@ class TemplateTableService {
     }
   }
 
+  static async updateTemplateStatus(templateName, newStatus) {
+    try {
+      return await ApiBaseHelper.patch(ApiLinks.TEMPLATE_STATUS, {
+        TemplateName: templateName,
+        Status: newStatus,
+      });
+    } catch (error) {
+      console.error('Error updating template status:', error);
+      throw error;
+    }
+  }
+
   static async getDraftList() {
     try {
       return await ApiBaseHelper.get(ApiLinks.TEMPLATE_DRAFT_LIST);
     } catch (error) {
       console.error('Error fetching draft list:', error);
       throw error;
-
     }
   }
 }

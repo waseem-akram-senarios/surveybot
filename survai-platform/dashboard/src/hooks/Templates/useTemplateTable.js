@@ -111,6 +111,16 @@ export const useTemplateTableOperations = () => {
     }
   };
 
+  const updateTemplateStatus = async (templateName, newStatus) => {
+    try {
+      await TemplateTableService.updateTemplateStatus(templateName, newStatus);
+      return { success: true };
+    } catch (error) {
+      console.error("Error updating template status:", error);
+      return { success: false, error: error.message };
+    }
+  };
+
   return {
     deleteLoading,
     cloneLoading,
@@ -119,6 +129,7 @@ export const useTemplateTableOperations = () => {
     handleTemplateClick,
     cloneTemplate,
     deleteTemplate,
+    updateTemplateStatus,
   };
 };
 

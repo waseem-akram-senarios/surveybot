@@ -254,12 +254,6 @@ async def delete_survey(survey_id: str):
                 detail=f"Survey with ID {survey_id} not found",
             )
 
-        if res[0]["status"] == "Completed":
-            raise HTTPException(
-                status_code=500,
-                detail=f"Can't delete Survey with ID {survey_id} since it is completed",
-            )
-
         # Delete all questions and answers for each question in the survey
         sql_query = """DELETE FROM survey_response_items WHERE survey_id = :survey_id"""
         sql_dict = {"survey_id": survey_id}
@@ -270,6 +264,8 @@ async def delete_survey(survey_id: str):
         sql_dict = {"survey_id": survey_id}
         sql_execute(sql_query, sql_dict)
         return {"message": f"Survey deleted with SurveyId {survey_id}"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

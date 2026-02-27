@@ -174,13 +174,6 @@ async def delete_template(request: TemplateNameRequestP):
                 detail=f"Template with Name {request.TemplateName} not found",
             )
 
-        # Do not delete if status is published
-        if res[0]["status"] == "Published":
-            raise HTTPException(
-                status_code=400,
-                detail=f"Template with name '{template_name}' is published and cannot be deleted",
-            )
-
         # 1. delete category mappings
         sql_query = """
         DELETE FROM question_category_mappings qcm

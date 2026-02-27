@@ -34,6 +34,7 @@ const TemplateTableBase = ({
   onTemplateClick,
   onCloneTemplate,
   onDeleteTemplate,
+  onStatusToggle,
   columns,
   dataMapper = (data) => data,
   refreshTable,
@@ -103,6 +104,35 @@ const TemplateTableBase = ({
         selectedTemplate: template.originalName || template.name 
       }
     });
+  };
+
+  const handleStatusToggle = async (e, template) => {
+    e.stopPropagation();
+    if (!onStatusToggle) return;
+    try {
+      const result = await onStatusToggle(template);
+      if (result.success) {
+        const newStatus = template.status === "Published" ? "Draft" : "Published";
+        setSnackbar({
+          open: true,
+          message: `Template "${template.name}" changed to ${newStatus}`,
+          severity: 'success'
+        });
+        if (refreshTable) refreshTable();
+      } else {
+        setSnackbar({
+          open: true,
+          message: `Failed to update status: ${result.error}`,
+          severity: 'error'
+        });
+      }
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: `Failed to update status: ${error.message}`,
+        severity: 'error'
+      });
+    }
   };
 
   const handleCloneTemplateAction = async () => {
@@ -377,6 +407,7 @@ const TemplateTableBase = ({
                     onDeleteClick={handleDeleteClick}
                     onCloneClick={handleCloneClick}
                     onLaunchSurveyClick={handleLaunchSurveyClick}
+                    onStatusToggle={onStatusToggle ? handleStatusToggle : null}
                     disabled={templateLoading}
                   />
                 ))}

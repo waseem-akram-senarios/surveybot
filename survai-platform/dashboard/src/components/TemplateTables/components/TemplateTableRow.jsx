@@ -1,15 +1,20 @@
-import { TableRow, TableCell, Typography, Chip, IconButton } from "@mui/material";
+import { TableRow, TableCell, Typography, Chip, IconButton, Tooltip } from "@mui/material";
 import DeleteIcon from '../../../assets/DeleteRow.svg';
 import CloneIcon from '../../../assets/Clone.svg';
 import LaunchSurvey from '../../../assets/LaunchSurvey.svg';
+import PublishIcon from '@mui/icons-material/PublishOutlined';
+import UnpublishedIcon from '@mui/icons-material/UnpublishedOutlined';
 
 const TemplateTableRow = ({ 
   template, 
   onTemplateClick, 
   onDeleteClick, 
   onCloneClick, 
-  onLaunchSurveyClick 
+  onLaunchSurveyClick,
+  onStatusToggle,
 }) => {
+  const isPublished = template.status === "Published";
+
   return (
     <TableRow
       key={template.id}
@@ -51,14 +56,8 @@ const TemplateTableRow = ({
         <Chip
           label={template.status}
           sx={{
-            backgroundColor:
-              template.status === "Published"
-                ? "#E4FFEA"
-                : "#F3F3FF",
-            color:
-              template.status === "Published"
-                ? "#00A857"
-                : "#550FEC",
+            backgroundColor: isPublished ? "#E4FFEA" : "#F3F3FF",
+            color: isPublished ? "#00A857" : "#550FEC",
             fontWeight: 500,
             fontFamily: "Poppins, sans-serif",
             borderRadius: "6px",
@@ -68,7 +67,7 @@ const TemplateTableRow = ({
         />
       </TableCell>
       <TableCell align="right">
-        {template.status === "Published" && (
+        {isPublished && (
           <IconButton
             variant="outlined"
             sx={{
@@ -82,7 +81,7 @@ const TemplateTableRow = ({
             <img src={LaunchSurvey} alt="Launch Survey" />
           </IconButton>
         )}
-        {template.status == "Published" && 
+        {isPublished && (
           <IconButton
             variant="outlined"
             onClick={(e) => onCloneClick(e, template)}
@@ -95,20 +94,45 @@ const TemplateTableRow = ({
           >
             <img src={CloneIcon} alt="Clone" />
           </IconButton>
-        }
-        {template.status !== "Published" && (
+        )}
+        {onStatusToggle && (
+          <Tooltip title={isPublished ? "Unpublish (make Draft)" : "Publish"}>
+            <IconButton
+              onClick={(e) => { e.stopPropagation(); onStatusToggle(e, template); }}
+              sx={{
+                borderRadius: "10px",
+                border: '1px solid #E0E0E0',
+                width: "36px",
+                height: "36px",
+                mr: 1,
+                '&:hover': {
+                  backgroundColor: isPublished ? '#FFF8E1' : '#E8F5E9',
+                  borderColor: isPublished ? '#F57C00' : '#00A857',
+                },
+              }}
+            >
+              {isPublished
+                ? <UnpublishedIcon sx={{ fontSize: 18, color: '#F57C00' }} />
+                : <PublishIcon sx={{ fontSize: 18, color: '#00A857' }} />
+              }
+            </IconButton>
+          </Tooltip>
+        )}
+        <Tooltip title="Delete">
           <IconButton
             variant="outlined"
             onClick={(e) => onDeleteClick(e, template)}
             sx={{
-              borderRadius: "15px",
-              width: "100px",
-              height: "40px",
+              borderRadius: "10px",
+              border: '1px solid #E0E0E0',
+              width: "36px",
+              height: "36px",
+              '&:hover': { backgroundColor: '#FFF0F0', borderColor: '#D32F2F' },
             }}
           >
-            <img src={DeleteIcon} alt="Delete" />
+            <img src={DeleteIcon} alt="Delete" style={{ width: 18, height: 18 }} />
           </IconButton>
-        )}
+        </Tooltip>
       </TableCell>
     </TableRow>
   );

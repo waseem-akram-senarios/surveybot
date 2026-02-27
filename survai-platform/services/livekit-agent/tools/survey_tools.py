@@ -8,7 +8,7 @@ Only two tools:
 
 import asyncio
 from datetime import datetime
-from typing import Callable
+from typing import Callable, List
 
 from livekit.agents import function_tool, RunContext
 
@@ -27,7 +27,10 @@ def create_survey_tools(
     log_handler,
     cleanup_logging_fn: Callable,
     disconnect_fn: Callable = None,
+    question_ids: List[str] = None,
 ):
+    total_questions = len(question_ids) if question_ids else 0
+
     @function_tool()
     async def record_answer(context: RunContext, question_id: str, answer: str):
         """
@@ -38,8 +41,27 @@ def create_survey_tools(
             answer: The caller's response in their own words
         """
         survey_responses["answers"][question_id] = answer
-        logger.info(f"✅ [{question_id}] {answer[:120]}")
-        return "Recorded."
+        done = list(survey_responses["answers"].keys())
+        done_count = len(done)
+        logger.info(f"✅ [{question_id}] ({done_count}/{total_questions}) {answer[:120]}")
+
+        if question_ids:
+            remaining = [q for q in question_ids if q not in done]
+            if remaining:
+                return (
+                    f"Recorded {question_id}. "
+                    f"Progress: {done_count}/{total_questions} done. "
+                    f"ALREADY ASKED (do NOT repeat): {', '.join(done)}. "
+                    f"NEXT question to ask: {remaining[0]}. "
+                    f"Remaining: {', '.join(remaining)}."
+                )
+            else:
+                return (
+                    f"Recorded {question_id}. "
+                    f"ALL {total_questions} questions are done. "
+                    f"Say goodbye and call end_survey(reason='completed') NOW."
+                )
+        return f"Recorded {question_id}."
 
     @function_tool()
     async def end_survey(context: RunContext, reason: str = "completed"):
@@ -58,7 +80,6 @@ def create_survey_tools(
         save_survey_responses(caller_number, survey_responses, call_duration)
         cleanup_logging_fn(log_handler)
 
-        # Let TTS finish the goodbye before dropping the call
         await asyncio.sleep(HANGUP_DELAY_SECONDS)
 
         if disconnect_fn:
